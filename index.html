@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>War Room · Draft Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ============ theme (dark, locked) ============ */
+  :root{
+    /* palette from the sun/moon poster: ink black, cream, vermilion, periwinkle */
+    --bg:        oklch(0.18 0.015 285);  /* blue-black ink */
+    --surface:   oklch(0.22 0.018 285);
+    --surface-2: oklch(0.26 0.02 285);
+    --line:      oklch(0.32 0.02 285);
+    --text:      oklch(0.94 0.02 90);    /* cream */
+    --dim:       oklch(0.69 0.015 285);
+    --accent:    oklch(0.63 0.19 35);    /* vermilion: hot, actions, YOUR picks */
+    --accent-ink:oklch(0.97 0.015 90);
+    --accent-2:  oklch(0.67 0.14 275);   /* periwinkle: cool, filters, info */
+    --danger:    oklch(0.68 0.17 15);
+    /* position colors (semantic data-viz roles, tuned to the poster) */
+    --qb: oklch(0.62 0.13 20);  --rb: oklch(0.66 0.09 160);
+    --wr: oklch(0.66 0.12 275); --te: oklch(0.72 0.11 75);
+    --k:  oklch(0.64 0.02 280); --dst:oklch(0.60 0.06 45);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    /* faint grid, echoing the poster background */
+    background-image:
+      linear-gradient(oklch(0.94 0.02 90 / 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.94 0.02 90 / 0.035) 1px, transparent 1px);
+    background-size:48px 48px;
+    font:400 15px/1.5 "IBM Plex Sans",sans-serif;
+    padding-bottom:4rem;
+  }
+  h1,h2{font-family:Outfit,sans-serif; letter-spacing:-0.02em}
+  button{
+    font:600 14px "IBM Plex Sans",sans-serif; color:var(--text);
+    background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer; min-height:44px;
+  }
+  button:hover{background:var(--line)}
+  button:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+  button.primary{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+  input,textarea,select{
+    background:var(--surface); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:0.5rem 0.65rem; font:inherit; min-height:44px;
+  }
+  .mono{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+
+  /* ============ layout ============ */
+  .wrap{max-width:1200px; margin:0 auto; padding:0 0.75rem}
+  @media(min-width:1024px){
+    .cols{display:grid; grid-template-columns:1fr 330px; gap:1.25rem; align-items:start}
+    #sidebar{position:sticky; top:0.75rem}
+  }
+
+  header.app{display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; padding:0.9rem 0 0.5rem}
+  header.app h1{font-size:1.35rem; margin:0}
+  #dataStatus{color:var(--dim); font-size:0.8rem; margin-left:auto}
+
+  /* pick bar */
+  #pickbar{
+    display:flex; flex-wrap:wrap; gap:0.4rem 1.25rem; align-items:baseline;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:0.6rem 0.9rem; margin:0.5rem 0;
+    border-top:3px solid transparent;
+    border-image:linear-gradient(90deg, var(--accent), var(--accent-2)) 1;
+  }
+  #pickbar .big{font-family:Outfit,sans-serif; font-weight:700; font-size:1.25rem}
+  #pickbar .mine{color:var(--accent)}
+  #pickbar .dim{color:var(--dim); font-size:0.85rem}
+
+  /* controls */
+  #controls{display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.6rem 0; align-items:center}
+  #search{flex:1 1 160px; min-width:140px}
+  .chips{display:flex; gap:0.35rem; flex-wrap:wrap}
+  .chip{padding:0.4rem 0.7rem; border-radius:999px; min-height:40px}
+  .chip[aria-pressed="true"]{background:var(--accent-2); color:var(--bg); border-color:transparent}
+  .toggle[aria-pressed="true"]{border-color:var(--accent-2); color:var(--accent-2)}
+
+  /* player rows */
+  #board{list-style:none; margin:0; padding:0; border-top:1px solid var(--line)}
+  .row{
+    display:grid; gap:0.15rem 0.6rem; align-items:center;
+    grid-template-columns:2.6rem 1fr auto; padding:0.5rem 0.15rem;
+    border-bottom:1px solid var(--line);
+  }
+  .row .rk{color:var(--dim); text-align:right; font-size:0.85rem}
+  .row .who{min-width:0}
+  .row .name{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .row .meta{color:var(--dim); font-size:0.78rem; display:flex; gap:0.5rem; align-items:center}
+  .pos{
+    display:inline-block; font:600 0.7rem "IBM Plex Mono",monospace;
+    padding:0.1rem 0.4rem; border-radius:5px; color:var(--bg);
+  }
+  .pos-QB{background:var(--qb)} .pos-RB{background:var(--rb)} .pos-WR{background:var(--wr)}
+  .pos-TE{background:var(--te)} .pos-K{background:var(--k)}  .pos-DST{background:var(--dst)}
+  .row .acts{display:flex; gap:0.35rem}
+  .row .acts button{min-width:44px; padding:0.4rem 0.55rem}
+  .row.taken{opacity:0.38}
+  .row.taken .name{text-decoration:line-through}
+  .row.mine .name{color:var(--accent)}
+  .row .notebtn.has{color:var(--accent)}
+  .noteBox{grid-column:1 / -1}
+  .noteBox textarea{width:100%; min-height:70px}
+  .arrows button{min-width:44px}
+
+  /* sidebar / my team */
+  #sidebar{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0.8rem 0.9rem; margin-top:0.8rem}
+  #sidebar h2{font-size:1rem; margin:0 0 0.5rem}
+  #myteam .slot{display:flex; gap:0.5rem; padding:0.25rem 0; font-size:0.9rem}
+  #myteam .slot .pos{flex:0 0 auto}
+  #myteam .empty{color:var(--dim)}
+  #settings{display:none; gap:0.6rem; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0.75rem; margin:0.5rem 0}
+  #settings.open{display:flex}
+  #settings label{display:flex; flex-direction:column; gap:0.25rem; font-size:0.8rem; color:var(--dim)}
+  #settings input{width:6.5rem}
+
+  /* import + error panel */
+  #panel{display:none; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0.9rem; margin:0.6rem 0}
+  #panel.open{display:block}
+  #panel textarea{width:100%; min-height:130px; font-family:"IBM Plex Mono",monospace; font-size:12px}
+  #panel .hint{color:var(--dim); font-size:0.85rem}
+  .err{color:var(--danger)}
+
+  footer{color:var(--dim); font-size:0.75rem; padding:1.2rem 0}
+  footer a{color:var(--dim)}
+  @media(prefers-reduced-motion:no-preference){
+    .row{transition:opacity 0.15s ease-out}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <h1>War Room</h1>
+    <button id="settingsBtn" class="toggle" aria-pressed="false">Settings</button>
+    <button id="importBtn">Import CSV</button>
+    <button id="refreshBtn">Refresh ADP</button>
+    <span id="dataStatus" role="status">loading…</span>
+  </header>
+
+  <div id="settings">
+    <label>Teams <input id="setTeams" type="number" min="2" max="32" inputmode="numeric"></label>
+    <label>Your slot <input id="setSlot" type="number" min="1" max="32" inputmode="numeric" placeholder="?"></label>
+    <label>Rounds <input id="setRounds" type="number" min="1" max="30" inputmode="numeric"></label>
+    <button id="undoBtn">Undo</button>
+    <button id="resetBtn">Reset draft</button>
+  </div>
+
+  <div id="pickbar">
+    <span>On the clock: <span class="big mono" id="curPick">1.01</span></span>
+    <span id="minePick" class="dim"></span>
+    <span id="depthNote" class="dim"></span>
+  </div>
+
+  <div id="panel">
+    <p class="hint" id="panelMsg"></p>
+    <p class="hint">Paste a rankings CSV below (FantasyPros cheat sheet export works: needs columns for rank, player name, team, position; tier and bye are optional).</p>
+    <textarea id="csvBox" placeholder='"RK","TIERS","PLAYER NAME","TEAM","POS","BYE WEEK"&#10;"1","1","Player Name","CIN","WR1","10"'></textarea>
+    <p><button id="parseBtn" class="primary">Load pasted CSV</button> <span id="parseMsg" class="hint"></span></p>
+  </div>
+
+  <div class="cols">
+    <section>
+      <div id="controls">
+        <input id="search" type="search" placeholder="Search player or team">
+        <div class="chips" id="posChips" role="group" aria-label="Position filter"></div>
+        <button class="toggle" id="hideTakenBtn" aria-pressed="true">Hide drafted</button>
+        <button class="toggle" id="editBtn" aria-pressed="false">Edit ranks</button>
+      </div>
+      <ul id="board"></ul>
+    </section>
+
+    <aside id="sidebar">
+      <h2>My team (<span id="myCount">0</span>)</h2>
+      <div id="myteam"></div>
+    </aside>
+  </div>
+
+  <footer>
+    ADP data from <a href="https://fantasyfootballcalculator.com" rel="noopener">Fantasy Football Calculator</a> (PPR). Everything is saved in this browser only.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   War Room: 20-team PPR snake draft board
+   Single file, no build step. State lives in localStorage.
+   ========================================================= */
+
+const LS_KEY = "warroom_v1";
+const ADP_URL = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=14&year=" + seasonYear();
+const POSITIONS = ["QB","RB","WR","TE","K","DST"];
+
+let state = {
+  settings: { teams: 20, slot: null, rounds: 16 },
+  players: [],            // [{key,name,pos,team,bye,adp,tier}]
+  order: [],              // array of keys: the custom rank order
+  statuses: {},           // key -> "taken" | "mine"
+  notes: {},              // key -> string
+  history: [],            // [{key, prev}] for undo
+  source: null,           // "ffc" | "csv"
+  fetchedAt: null,
+};
+let ui = { posFilter: "ALL", search: "", hideTaken: true, edit: false, openNote: null };
+
+/* ---------- small utils (each with edge handling) ---------- */
+
+function seasonYear(){
+  // NFL season year: Jan and Feb still belong to the previous season's drafts,
+  // so before March we use last year. Otherwise current year.
+  const d = new Date();
+  return d.getMonth() < 2 ? d.getFullYear() - 1 : d.getFullYear();
+}
+
+function normalizePos(raw){
+  // Accepts "WR", "WR1", "D/ST", "DEF", "PK" etc. Returns canonical or null.
+  if (typeof raw !== "string") return null;
+  const p = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  if (p.startsWith("QB")) return "QB";
+  if (p.startsWith("RB")) return "RB";
+  if (p.startsWith("WR")) return "WR";
+  if (p.startsWith("TE")) return "TE";
+  if (p === "K" || p === "PK") return "K";
+  if (p === "DST" || p === "DEF" || p === "D") return "DST";
+  return null;
+}
+
+function playerKey(name, pos){
+  // Stable key that survives a data refresh. Lowercased, punctuation stripped.
+  if (!name) return null;
+  return String(name).toLowerCase().replace(/[^a-z0-9]/g, "") + "|" + (pos || "");
+}
+
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+/* ---------- snake draft math ---------- */
+
+function overallToRoundPick(overall, teams){
+  // 1-based overall pick -> {round, pick}. Guards bad input.
+  if (!Number.isInteger(overall) || overall < 1 || !Number.isInteger(teams) || teams < 1) return null;
+  const round = Math.ceil(overall / teams);
+  const idx = overall - (round - 1) * teams;           // 1..teams in draft order
+  const pick = (round % 2 === 1) ? idx : teams - idx + 1; // seat number on the clock
+  return { round, pick: idx, seat: pick };
+}
+
+function myOverallPicks(slot, teams, rounds){
+  // All overall pick numbers belonging to a seat in a snake draft.
+  if (!Number.isInteger(slot) || slot < 1 || slot > teams) return [];
+  if (!Number.isInteger(teams) || teams < 1 || !Number.isInteger(rounds) || rounds < 1) return [];
+  const picks = [];
+  for (let r = 1; r <= rounds; r++){
+    picks.push(r % 2 === 1
+      ? (r - 1) * teams + slot
+      : (r - 1) * teams + (teams - slot + 1));
+  }
+  return picks;
+}
+
+/* ---------- CSV parsing (FantasyPros-style or generic) ---------- */
+
+function parseCSVLine(line){
+  // Handles quoted fields with commas and doubled quotes.
+  const out = []; let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (inQ){
+      if (ch === '"' && line[i+1] === '"'){ cur += '"'; i++; }
+      else if (ch === '"') inQ = false;
+      else cur += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ",") { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseRankingsCSV(text){
+  // Returns {players, error}. Never throws.
+  if (typeof text !== "string" || !text.trim()) return { players: [], error: "Nothing pasted." };
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return { players: [], error: "Need a header row plus at least one player." };
+
+  const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+  const col = (...names) => header.findIndex(h => names.some(n => h.includes(n)));
+  const iName = col("player"), iPos = col("pos"), iTeam = col("team"),
+        iRank = col("rk", "rank"), iBye = col("bye"), iTier = col("tier");
+  if (iName === -1 || iPos === -1) return { players: [], error: "Could not find PLAYER and POS columns in the header." };
+
+  const players = [], seen = new Set();
+  for (let li = 1; li < lines.length; li++){
+    const f = parseCSVLine(lines[li]);
+    const name = (f[iName] || "").trim();
+    const pos = normalizePos(f[iPos]);
+    if (!name || !pos) continue;                    // skip junk rows
+    const key = playerKey(name, pos);
+    if (seen.has(key)) continue;                    // skip duplicates
+    seen.add(key);
+    players.push({
+      key, name, pos,
+      team: iTeam !== -1 ? (f[iTeam] || "").trim().toUpperCase() : "",
+      bye:  iBye  !== -1 ? parseInt(f[iBye], 10) || null : null,
+      adp:  iRank !== -1 ? parseFloat(f[iRank]) || (li) : li,
+      tier: iTier !== -1 ? parseInt(f[iTier], 10) || null : null,
+    });
+  }
+  if (!players.length) return { players: [], error: "Parsed 0 players. Check the column headers." };
+  return { players, error: null };
+}
+
+/* ---------- data loading ---------- */
+
+async function fetchADP(){
+  setStatus("fetching ADP…");
+  try {
+    const res = await fetch(ADP_URL, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    if (!json || !Array.isArray(json.players) || !json.players.length){
+      throw new Error("empty player list");
+    }
+    const seen = new Set();
+    const players = [];
+    for (const p of json.players){
+      const pos = normalizePos(p.position);
+      const key = playerKey(p.name, pos);
+      if (!pos || !key || seen.has(key)) continue;
+      seen.add(key);
+      players.push({
+        key, name: p.name, pos,
+        team: (p.team || "").toUpperCase(),
+        bye: Number.isInteger(p.bye) ? p.bye : null,
+        adp: typeof p.adp === "number" ? p.adp : 999,
+        tier: null,
+      });
+    }
+    players.sort((a, b) => a.adp - b.adp);
+    adoptPlayers(players, "ffc");
+    setStatus(players.length + " players, FFC ADP · " + new Date().toLocaleDateString());
+    hidePanel();
+  } catch (err) {
+    // Explicit failure path: tell Tayls exactly what happened and open the fallback.
+    setStatus("ADP fetch failed", true);
+    showPanel("Could not load ADP from Fantasy Football Calculator (" + esc(err.message) +
+      "). Paste a rankings CSV instead, or try Refresh ADP again.");
+  }
+}
+
+function adoptPlayers(players, source){
+  // Merge new data while PRESERVING draft statuses, notes, and custom order.
+  state.players = players;
+  state.source = source;
+  state.fetchedAt = Date.now();
+  const valid = new Set(players.map(p => p.key));
+  // keep existing order for players still present, append new ones by adp
+  const kept = state.order.filter(k => valid.has(k));
+  const known = new Set(kept);
+  for (const p of players) if (!known.has(p.key)) kept.push(p.key);
+  state.order = kept;
+  save(); render();
+}
+
+/* ---------- persistence ---------- */
+
+function save(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch (e) { setStatus("warning: could not save (storage full or blocked)", true); }
+}
+
+function load(){
+  let raw = null;
+  try { raw = localStorage.getItem(LS_KEY); } catch (e) { /* private mode: start fresh */ }
+  if (!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if (s && Array.isArray(s.players)) { state = Object.assign(state, s); return true; }
+  } catch (e) { /* corrupted: start fresh */ }
+  return false;
+}
+
+/* ---------- actions ---------- */
+
+function setPlayerStatus(key, next){
+  const prev = state.statuses[key] || null;
+  if (prev === next) next = null;               // tapping again un-does it
+  state.history.push({ key, prev });
+  if (state.history.length > 100) state.history.shift();
+  if (next) state.statuses[key] = next; else delete state.statuses[key];
+  save(); render();
+}
+
+function undo(){
+  const last = state.history.pop();
+  if (!last) return;
+  if (last.prev) state.statuses[last.key] = last.prev; else delete state.statuses[last.key];
+  save(); render();
+}
+
+function resetDraft(){
+  if (!confirm("Clear all drafted/mine marks? Rankings and notes stay.")) return;
+  state.statuses = {}; state.history = [];
+  save(); render();
+}
+
+function moveKey(key, dir){
+  // dir: -1 up, +1 down, "top"
+  const i = state.order.indexOf(key);
+  if (i === -1) return;
+  state.order.splice(i, 1);
+  const j = dir === "top" ? 0 : Math.max(0, Math.min(state.order.length, i + dir));
+  state.order.splice(j, 0, key);
+  save(); render();
+}
+
+/* ---------- rendering ---------- */
+
+const $ = id => document.getElementById(id);
+const byKey = () => new Map(state.players.map(p => [p.key, p]));
+
+function setStatus(msg, isErr){
+  $("dataStatus").textContent = msg;
+  $("dataStatus").className = isErr ? "err" : "";
+}
+function showPanel(msg){ $("panel").classList.add("open"); $("panelMsg").innerHTML = msg; }
+function hidePanel(){ $("panel").classList.remove("open"); $("parseMsg").textContent = ""; }
+
+function renderPickbar(){
+  const { teams, slot, rounds } = state.settings;
+  const takenCount = Object.keys(state.statuses).length;
+  const overall = takenCount + 1;
+  const rp = overallToRoundPick(overall, teams);
+  $("curPick").textContent = rp ? rp.round + "." + String(rp.pick).padStart(2, "0") + " (#" + overall + ")" : "?";
+
+  const mine = myOverallPicks(slot, teams, rounds);
+  const nextMine = mine.find(n => n >= overall);
+  if (!slot) $("minePick").textContent = "Set your slot in Settings to track your picks";
+  else if (nextMine === overall) { $("minePick").innerHTML = '<span class="mine big">YOU ARE UP</span>'; }
+  else if (nextMine) $("minePick").textContent = "Your next pick: #" + nextMine + " (in " + (nextMine - overall) + ")";
+  else $("minePick").textContent = "No picks left";
+
+  $("depthNote").textContent = state.players.length
+    ? state.players.length + " ranked · " + (teams * rounds) + " total picks"
+    : "";
+}
+
+function renderBoard(){
+  const map = byKey();
+  const q = ui.search.trim().toLowerCase();
+  const rows = [];
+  let shownRank = 0;
+  for (const key of state.order){
+    const p = map.get(key); if (!p) continue;
+    shownRank++;
+    const st = state.statuses[key] || "";
+    if (ui.hideTaken && st) continue;
+    if (ui.posFilter !== "ALL" && p.pos !== ui.posFilter) continue;
+    if (q && !(p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q))) continue;
+    const note = state.notes[key];
+    const tier = p.tier ? ' <span class="mono">T' + p.tier + "</span>" : "";
+    const acts = ui.edit
+      ? '<span class="arrows">' +
+        '<button data-a="top" data-k="' + key + '" aria-label="Move to top">⤒</button>' +
+        '<button data-a="up" data-k="' + key + '" aria-label="Move up">↑</button>' +
+        '<button data-a="down" data-k="' + key + '" aria-label="Move down">↓</button></span>'
+      : '<button data-a="note" data-k="' + key + '" class="notebtn' + (note ? " has" : "") + '" aria-label="Note">✎</button>' +
+        '<button data-a="taken" data-k="' + key + '" aria-label="Drafted by someone">✕</button>' +
+        '<button data-a="mine" data-k="' + key + '" class="primary" aria-label="My pick">＋</button>';
+    rows.push(
+      '<li class="row ' + st + '">' +
+        '<span class="rk mono">' + shownRank + '</span>' +
+        '<span class="who"><span class="name">' + esc(p.name) + '</span>' +
+          '<span class="meta"><span class="pos pos-' + p.pos + '">' + p.pos + '</span>' +
+          '<span>' + esc(p.team || "FA") + (p.bye ? " · bye " + p.bye : "") + '</span>' +
+          '<span class="mono">ADP ' + (p.adp < 900 ? p.adp.toFixed(1) : "-") + '</span>' + tier + '</span></span>' +
+        '<span class="acts">' + acts + '</span>' +
+        (ui.openNote === key
+          ? '<span class="noteBox"><textarea data-note="' + key + '" placeholder="Sleeper? Fade? Handcuff?">' + esc(note || "") + '</textarea></span>'
+          : "") +
+      "</li>");
+  }
+  $("board").innerHTML = rows.join("") ||
+    '<li class="row"><span></span><span class="who"><span class="meta">No players match. Load ADP or import a CSV above.</span></span></li>';
+}
+
+function renderMyTeam(){
+  const map = byKey();
+  const mine = Object.keys(state.statuses).filter(k => state.statuses[k] === "mine").map(k => map.get(k)).filter(Boolean);
+  $("myCount").textContent = mine.length;
+  if (!mine.length){ $("myteam").innerHTML = '<p class="empty">No picks yet. Tap ＋ on a player when you draft them.</p>'; return; }
+  const groups = {};
+  for (const p of mine) (groups[p.pos] = groups[p.pos] || []).push(p);
+  let html = "";
+  for (const pos of POSITIONS){
+    for (const p of (groups[pos] || [])){
+      html += '<div class="slot"><span class="pos pos-' + pos + '">' + pos + '</span><span>' + esc(p.name) +
+              '</span><span class="mono" style="color:var(--dim)">' + (p.bye ? "bye " + p.bye : "") + "</span></div>";
+    }
+  }
+  $("myteam").innerHTML = html;
+}
+
+function render(){ renderPickbar(); renderBoard(); renderMyTeam(); }
+
+/* ---------- wire up ---------- */
+
+function initChips(){
+  $("posChips").innerHTML = ["ALL", ...POSITIONS].map(p =>
+    '<button class="chip" data-pos="' + p + '" aria-pressed="' + (p === ui.posFilter) + '">' + p + "</button>").join("");
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.pos){ ui.posFilter = b.dataset.pos; initChips(); renderBoard(); return; }
+  const k = b.dataset.k, a = b.dataset.a;
+  if (a === "taken") return setPlayerStatus(k, "taken");
+  if (a === "mine")  return setPlayerStatus(k, "mine");
+  if (a === "note"){ ui.openNote = ui.openNote === k ? null : k; renderBoard();
+    if (ui.openNote){ const t = document.querySelector('[data-note="' + k + '"]'); if (t) t.focus(); } return; }
+  if (a === "up")   return moveKey(k, -1);
+  if (a === "down") return moveKey(k, +1);
+  if (a === "top")  return moveKey(k, "top");
+});
+
+document.addEventListener("focusout", e => {
+  const t = e.target;
+  if (t.matches && t.matches("textarea[data-note]")){
+    const k = t.dataset.note, v = t.value.trim();
+    if (v) state.notes[k] = v; else delete state.notes[k];
+    save(); ui.openNote = null; renderBoard();
+  }
+});
+
+$("search").addEventListener("input", e => { ui.search = e.target.value; renderBoard(); });
+$("hideTakenBtn").addEventListener("click", e => {
+  ui.hideTaken = !ui.hideTaken; e.target.setAttribute("aria-pressed", ui.hideTaken); renderBoard();
+});
+$("editBtn").addEventListener("click", e => {
+  ui.edit = !ui.edit; e.target.setAttribute("aria-pressed", ui.edit); renderBoard();
+});
+$("settingsBtn").addEventListener("click", e => {
+  const open = $("settings").classList.toggle("open");
+  e.target.setAttribute("aria-pressed", open);
+});
+$("importBtn").addEventListener("click", () => showPanel("Manual import."));
+$("refreshBtn").addEventListener("click", fetchADP);
+$("undoBtn").addEventListener("click", undo);
+$("resetBtn").addEventListener("click", resetDraft);
+$("parseBtn").addEventListener("click", () => {
+  const { players, error } = parseRankingsCSV($("csvBox").value);
+  if (error){ $("parseMsg").textContent = error; $("parseMsg").className = "err"; return; }
+  adoptPlayers(players, "csv");
+  setStatus(players.length + " players · imported CSV");
+  hidePanel();
+});
+
+for (const [id, field] of [["setTeams","teams"],["setSlot","slot"],["setRounds","rounds"]]){
+  $(id).addEventListener("change", e => {
+    const v = parseInt(e.target.value, 10);
+    state.settings[field] = Number.isInteger(v) && v > 0 ? v : (field === "slot" ? null : state.settings[field]);
+    save(); renderPickbar();
+  });
+}
+
+/* ---------- self-tests (logged to console, no UI impact) ---------- */
+
+function runSelfTests(){
+  const t = (name, cond) => console[cond ? "log" : "error"]((cond ? "✓" : "✗ FAIL") + " " + name);
+  t("normalizePos WR1", normalizePos("WR1") === "WR");
+  t("normalizePos D/ST", normalizePos("D/ST") === "DST");
+  t("normalizePos junk", normalizePos(42) === null);
+  t("playerKey stable", playerKey("Ja'Marr Chase", "WR") === playerKey("JaMarr chase", "WR"));
+  t("snake r1", JSON.stringify(myOverallPicks(3, 20, 2)) === JSON.stringify([3, 38]));
+  t("snake last seat", JSON.stringify(myOverallPicks(20, 20, 2)) === JSON.stringify([20, 21]));
+  t("snake bad slot", myOverallPicks(0, 20, 2).length === 0);
+  t("roundpick 21@20", (() => { const r = overallToRoundPick(21, 20); return r.round === 2 && r.pick === 1; })());
+  t("roundpick bad", overallToRoundPick(0, 20) === null);
+  const csv = '"RK","TIERS","PLAYER NAME","TEAM","POS","BYE WEEK"\n"1","1","Test Player","CIN","WR1","10"\n"1","1","Test Player","CIN","WR1","10"';
+  const r = parseRankingsCSV(csv);
+  t("csv parse + dedupe", r.error === null && r.players.length === 1 && r.players[0].bye === 10);
+  t("csv empty", parseRankingsCSV("").error !== null);
+}
+
+/* ---------- boot ---------- */
+
+initChips();
+const had = load();
+$("setTeams").value = state.settings.teams;
+$("setSlot").value = state.settings.slot ?? "";
+$("setRounds").value = state.settings.rounds;
+render();
+runSelfTests();
+if (had && state.players.length){
+  setStatus(state.players.length + " players, " + (state.source === "csv" ? "imported CSV" : "FFC ADP") +
+    " · saved " + new Date(state.fetchedAt).toLocaleDateString());
+} else {
+  fetchADP();
+}
+</script>
+</body>
+</html>
