@@ -18,7 +18,7 @@
     --text:      oklch(0.94 0.02 90);    /* cream */
     --dim:       oklch(0.69 0.015 285);
     --accent:    oklch(0.63 0.19 35);    /* vermilion: hot, actions, YOUR picks */
-    --accent-ink:oklch(0.97 0.015 90);
+    --accent-ink:oklch(0.16 0.02 285);  /* ink on vermilion, for contrast */
     --accent-2:  oklch(0.67 0.14 275);   /* periwinkle: cool, filters, info */
     --danger:    oklch(0.68 0.17 15);
     /* position colors (semantic data-viz roles, tuned to the poster) */
@@ -70,9 +70,10 @@
   #pickbar{
     display:flex; flex-wrap:wrap; gap:0.4rem 1.25rem; align-items:baseline;
     background:var(--surface); border:1px solid var(--line); border-radius:10px;
-    padding:0.6rem 0.9rem; margin:0.5rem 0;
-    border-top:3px solid transparent;
-    border-image:linear-gradient(90deg, var(--accent), var(--accent-2)) 1;
+    padding:0.75rem 0.9rem 0.6rem; margin:0.5rem 0;
+    background:
+      linear-gradient(90deg, var(--accent), var(--accent-2)) top left / 100% 3px no-repeat,
+      var(--surface);
   }
   #pickbar .big{font-family:Outfit,sans-serif; font-weight:700; font-size:1.25rem}
   #pickbar .mine{color:var(--accent)}
