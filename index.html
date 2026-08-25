@@ -200,7 +200,11 @@
    ========================================================= */
 
 const LS_KEY = "warroom_v1";
-const ADP_URL = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams=14&year=" + seasonYear();
+// Routed through a Vercel proxy (api/adp.js in this repo) because Fantasy Football
+// Calculator's API doesn't send Access-Control-Allow-Origin, so a direct browser
+// fetch is always CORS-blocked. The proxy fetches server-to-server and re-adds
+// the header. See HANDOFF.md for the CORS story.
+const ADP_URL = "https://fantasy-football-taylor-ritchie-s-projects.vercel.app/api/adp?teams=14&year=" + seasonYear();
 const POSITIONS = ["QB","RB","WR","TE","K","DST"];
 
 let state = {
