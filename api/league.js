@@ -27,9 +27,15 @@ export default async function handler(req, res) {
 
   // mTeam: team names/records · mRoster: full rosters · mMatchup: weekly matchups
   // mStandings: standings/rank · mSettings: league name, scoring, roster slots
+  //
+  // Host is lm-api-reads.fantasy.espn.com, NOT fantasy.espn.com — ESPN moved
+  // the API subdomain at some point in 2024/2025. The old host still resolves
+  // and returns HTTP 200, but serves the generic fantasy.espn.com marketing
+  // page instead of JSON, which is a confusing silent failure if you don't
+  // know to check for it.
   const views = ['mTeam', 'mRoster', 'mMatchup', 'mStandings', 'mSettings'];
   const upstreamUrl =
-    `https://fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${leagueId}` +
+    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${leagueId}` +
     '?' + views.map(v => `view=${v}`).join('&');
 
   try {
