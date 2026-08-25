@@ -1,4 +1,4 @@
-<!doctype html>
+<![CDATA[<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -146,6 +146,7 @@
     <button id="settingsBtn" class="toggle" aria-pressed="false">Settings</button>
     <button id="importBtn">Import CSV</button>
     <button id="refreshBtn">Refresh ADP</button>
+    <button id="espnBtn" class="toggle" aria-pressed="false">ESPN Sync: Off</button>
     <span id="dataStatus" role="status">loading…</span>
   </header>
 
@@ -153,6 +154,8 @@
     <label>Teams <input id="setTeams" type="number" min="2" max="32" inputmode="numeric"></label>
     <label>Your slot <input id="setSlot" type="number" min="1" max="32" inputmode="numeric" placeholder="?"></label>
     <label>Rounds <input id="setRounds" type="number" min="1" max="30" inputmode="numeric"></label>
+    <label>ESPN league ID <input id="setEspnLeague" type="text" inputmode="numeric" placeholder="1573934181"></label>
+    <label>ESPN team ID (you) <input id="setEspnTeam" type="number" min="1" inputmode="numeric" placeholder="17"></label>
     <button id="undoBtn">Undo</button>
     <button id="resetBtn">Reset draft</button>
   </div>
@@ -205,6 +208,11 @@ const LS_KEY = "warroom_v1";
 // fetch is always CORS-blocked. The proxy fetches server-to-server and re-adds
 // the header. See HANDOFF.md for the CORS story.
 const ADP_URL = "https://fantasy-football-taylor-ritchie-s-projects.vercel.app/api/adp?teams=14&year=" + seasonYear();
+// Phase 2: live ESPN draft sync. Routed through a Vercel proxy (api/draft.js)
+// because the ESPN cookies (espn_s2, SWID) must never reach the browser and
+// ESPN's private league API needs them server-side. See HANDOFF.md.
+const ESPN_DRAFT_BASE = "https://fantasy-football-taylor-ritchie-s-projects.vercel.app/api/draft";
+const ESPN_POLL_MS = 5000;
 const POSITIONS = ["QB","RB","WR","TE","K","DST"];
 
 let state = {
@@ -216,7 +224,9 @@ let state = {
   history: [],            // [{key, prev}] for undo
   source: null,           // "ffc" | "csv"
   fetchedAt: null,
+  espn: { leagueId: "1573934181", teamId: 17, lastAppliedOverall: 0 },
 };
+let espnPollHandle = null;
 let ui = { posFilter: "ALL", search: "", hideTaken: true, edit: false, openNote: null };
 
 /* ---------- small utils (each with edge handling) ---------- */
@@ -367,6 +377,79 @@ async function fetchADP(){
     showPanel("Could not load ADP from Fantasy Football Calculator (" + esc(err.message) +
       "). Paste a rankings CSV instead, or try Refresh ADP again.");
   }
+}
+
+function applyEspnPick(key, next){
+  // Like setPlayerStatus but never toggles off — ESPN is the source of truth
+  // here, so a pick should always land as taken/mine, not un-apply itself.
+  const prev = state.statuses[key] || null;
+  if (prev === next) return;
+  state.history.push({ key, prev });
+  if (state.history.length > 100) state.history.shift();
+  state.statuses[key] = next;
+}
+
+async function fetchEspnDraft(){
+  const { leagueId, teamId } = state.espn;
+  if (!leagueId) { setEspnStatus("no ESPN league ID set", true); return; }
+  try {
+    const url = ESPN_DRAFT_BASE + "?leagueId=" + encodeURIComponent(leagueId) + "&year=" + seasonYear();
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    const json = await res.json();
+    if (!res.ok){
+      setEspnStatus("ESPN sync error: " + (json && json.error ? json.error : ("HTTP " + res.status)), true);
+      return;
+    }
+    const map = byKey();
+    const nameIndex = new Map();
+    for (const p of state.players) nameIndex.set(playerKey(p.name, p.pos), p.key);
+
+    let applied = 0, unmatched = 0;
+    const newPicks = (json.picks || []).filter(p => p.overall > state.espn.lastAppliedOverall)
+      .sort((a, b) => a.overall - b.overall);
+    for (const pick of newPicks){
+      if (!pick.name || !pick.pos) { unmatched++; continue; }
+      const k = playerKey(pick.name, pick.pos);
+      if (!nameIndex.has(k)) { unmatched++; continue; }
+      const targetKey = nameIndex.get(k);
+      const isMine = teamId != null && pick.teamId === teamId;
+      applyEspnPick(targetKey, isMine ? "mine" : "taken");
+      applied++;
+      state.espn.lastAppliedOverall = Math.max(state.espn.lastAppliedOverall, pick.overall);
+    }
+    if (applied) { save(); render(); }
+    const parts = [];
+    if (json.inProgress) parts.push("draft live");
+    else if (json.drafted) parts.push("draft complete");
+    else parts.push("draft not started");
+    parts.push((json.picks || []).length + " picks made");
+    if (unmatched) parts.push(unmatched + " unmatched this poll");
+    setEspnStatus(parts.join(" · "), false);
+  } catch (err) {
+    setEspnStatus("ESPN sync failed: " + (err && err.message ? err.message : "network error"), true);
+  }
+}
+
+function setEspnStatus(msg, isErr){
+  const b = $("espnBtn");
+  const on = espnPollHandle !== null;
+  b.textContent = "ESPN Sync: " + (on ? "On" : "Off") + (msg ? " — " + msg : "");
+  b.title = msg || "";
+  if (isErr) b.classList.add("err"); else b.classList.remove("err");
+}
+
+function toggleEspnSync(){
+  const b = $("espnBtn");
+  if (espnPollHandle){
+    clearInterval(espnPollHandle);
+    espnPollHandle = null;
+    b.setAttribute("aria-pressed", "false");
+    setEspnStatus("", false);
+    return;
+  }
+  b.setAttribute("aria-pressed", "true");
+  fetchEspnDraft();
+  espnPollHandle = setInterval(fetchEspnDraft, ESPN_POLL_MS);
 }
 
 function adoptPlayers(players, source){
@@ -566,6 +649,7 @@ $("settingsBtn").addEventListener("click", e => {
 });
 $("importBtn").addEventListener("click", () => showPanel("Manual import."));
 $("refreshBtn").addEventListener("click", fetchADP);
+$("espnBtn").addEventListener("click", toggleEspnSync);
 $("undoBtn").addEventListener("click", undo);
 $("resetBtn").addEventListener("click", resetDraft);
 $("parseBtn").addEventListener("click", () => {
@@ -583,6 +667,17 @@ for (const [id, field] of [["setTeams","teams"],["setSlot","slot"],["setRounds",
     save(); renderPickbar();
   });
 }
+
+$("setEspnLeague").addEventListener("change", e => {
+  const v = e.target.value.trim();
+  state.espn.leagueId = /^\d+$/.test(v) ? v : state.espn.leagueId;
+  save();
+});
+$("setEspnTeam").addEventListener("change", e => {
+  const v = parseInt(e.target.value, 10);
+  state.espn.teamId = Number.isInteger(v) && v > 0 ? v : state.espn.teamId;
+  save();
+});
 
 /* ---------- self-tests (logged to console, no UI impact) ---------- */
 
@@ -610,6 +705,8 @@ const had = load();
 $("setTeams").value = state.settings.teams;
 $("setSlot").value = state.settings.slot ?? "";
 $("setRounds").value = state.settings.rounds;
+$("setEspnLeague").value = state.espn.leagueId || "";
+$("setEspnTeam").value = state.espn.teamId ?? "";
 render();
 runSelfTests();
 if (had && state.players.length){
@@ -621,3 +718,4 @@ if (had && state.players.length){
 </script>
 </body>
 </html>
+]]>
