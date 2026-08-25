@@ -1,6 +1,6 @@
-<![CDATA[// Proxies ESPN's private fantasy football draft API. Browsers can't set custom
+// Proxies ESPN's private fantasy football draft API. Browsers can't set custom
 // Cookie headers on cross-origin requests, and even if they could, the cookies
-// would be exposed client-side — so this fetches server-to-server using cookies
+// would be exposed client-side, so this fetches server-to-server using cookies
 // held only in Vercel env vars (ESPN_S2, ESPN_SWID), never sent to the browser.
 // See HANDOFF.md for the ESPN integration story.
 
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     if (!draftRes.ok) {
       res.status(draftRes.status).json({
         error: draftRes.status === 401
-          ? 'ESPN rejected the cookies (401). They may have expired — re-grab espn_s2 and SWID from a logged-in browser session.'
+          ? 'ESPN rejected the cookies (401). They may have expired, re-grab espn_s2 and SWID from a logged-in browser session.'
           : `ESPN responded HTTP ${draftRes.status}`,
       });
       return;
@@ -96,4 +96,3 @@ export default async function handler(req, res) {
     res.status(502).json({ error: err && err.message ? err.message : 'Proxy fetch to ESPN failed' });
   }
 }
-]]>
