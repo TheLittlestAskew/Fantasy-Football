@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sports Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Theme matches index.html / league.html. Change all three together. */
+  :root{
+    --bg:oklch(0.18 0.015 285); --surface:oklch(0.22 0.018 285);
+    --surface-2:oklch(0.26 0.02 285); --line:oklch(0.32 0.02 285);
+    --text:oklch(0.94 0.02 90); --dim:oklch(0.69 0.015 285);
+    --accent:oklch(0.63 0.19 35); --accent-ink:oklch(0.16 0.02 285);
+    --accent-2:oklch(0.67 0.14 275); --danger:oklch(0.68 0.17 15);
+    --ok:oklch(0.70 0.13 150); --home:oklch(0.72 0.14 95);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    background-image:
+      linear-gradient(oklch(0.94 0.02 90 / 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.94 0.02 90 / 0.035) 1px, transparent 1px);
+    background-size:48px 48px;
+    font:400 15px/1.5 "IBM Plex Sans",sans-serif; padding-bottom:4rem;
+  }
+  h1,h2,h3{font-family:Outfit,sans-serif; letter-spacing:-0.02em}
+  a{color:var(--accent-2)}
+  button{
+    font:600 14px "IBM Plex Sans",sans-serif; color:var(--text);
+    background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer; min-height:44px;
+  }
+  button:hover{background:var(--line)}
+  button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .mono{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+  .wrap{max-width:1200px; margin:0 auto; padding:0 0.75rem}
+  header.app{display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; padding:0.9rem 0 0.5rem}
+  header.app h1{font-size:1.35rem; margin:0}
+  #status{color:var(--dim); font-size:0.8rem; margin-left:auto}
+  .err{color:var(--danger)}
+
+  .tabs{display:flex; gap:0.35rem; flex-wrap:wrap; margin:0.6rem 0 0.9rem}
+  .tab{padding:0.45rem 0.9rem; border-radius:999px}
+  .tab[aria-selected="true"]{background:var(--accent-2); color:var(--bg); border-color:transparent}
+  .panel{display:none} .panel.active{display:block}
+
+  .leagues{display:flex; gap:0.3rem; flex-wrap:wrap; margin:0 0 0.8rem}
+  .lg{padding:0.35rem 0.7rem; border-radius:999px; font-size:0.82rem; min-height:38px}
+  .lg[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+
+  .sgrid{display:grid; gap:0.6rem; grid-template-columns:1fr}
+  @media(min-width:700px){ .sgrid{grid-template-columns:1fr 1fr} }
+  @media(min-width:1050px){ .sgrid{grid-template-columns:1fr 1fr 1fr} }
+  .game{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0.65rem 0.8rem}
+  .gstate{font-size:0.72rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem}
+  .gstate.live{color:var(--ok); font-weight:600}
+  .trow{display:flex; align-items:center; gap:0.5rem; padding:0.18rem 0}
+  .trow img{width:22px;height:22px;object-fit:contain;flex:0 0 auto}
+  .trow .tn{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .trow .sc{font-family:"IBM Plex Mono",monospace; font-weight:600}
+  .trow.lose{opacity:0.55}
+  .note{color:var(--dim); font-size:0.8rem; margin:0.3rem 0 0}
+
+  .newsitem{background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:0.6rem 0.8rem; margin-bottom:0.5rem}
+  .newsitem h4{margin:0 0 0.2rem; font-size:0.95rem; font-family:Outfit,sans-serif}
+  .newsitem .meta{color:var(--dim); font-size:0.75rem}
+  .newsitem p{margin:0.3rem 0 0; font-size:0.87rem; color:var(--dim)}
+  .tag{display:inline-block; font:600 0.68rem "IBM Plex Mono",monospace;
+    background:var(--accent); color:var(--accent-ink); padding:0.08rem 0.4rem;
+    border-radius:4px; margin-right:0.35rem}
+
+  table{width:100%; border-collapse:collapse; font-size:0.9rem}
+  th,td{text-align:left; padding:0.45rem 0.5rem; border-bottom:1px solid var(--line)}
+  th{color:var(--dim); font-weight:600; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em}
+  td.num,th.num{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+  tr.mine{background:oklch(0.63 0.19 35 / 0.10)}
+  tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+  .divlabel{margin:1.1rem 0 0.4rem; font-size:0.95rem; color:var(--accent-2)}
+  .empty{color:var(--dim); padding:0.8rem 0}
+  .linkrow{display:flex; flex-wrap:wrap; gap:0.4rem; margin:0.5rem 0 0}
+  .linkrow a{
+    font-size:0.82rem; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:0.35rem 0.6rem; text-decoration:none;
+  }
+  footer{color:var(--dim); font-size:0.75rem; padding:1.5rem 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <h1>Sports Desk</h1>
+    <button id="reloadBtn">Reload</button>
+    <a href="./index.html">War Room</a>
+    <a href="./league.html">League</a>
+    <span id="status" role="status">…</span>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="scores" aria-selected="true">Scores</button>
+    <button class="tab" role="tab" data-tab="myteam" aria-selected="false">My Players</button>
+    <button class="tab" role="tab" data-tab="news" aria-selected="false">News</button>
+    <button class="tab" role="tab" data-tab="hs" aria-selected="false">Rome / Floyd HS</button>
+  </div>
+
+  <section id="tab-scores" class="panel active">
+    <div class="leagues" id="lgPicker" role="group" aria-label="League"></div>
+    <div id="scoreBody"></div>
+  </section>
+
+  <section id="tab-myteam" class="panel">
+    <p class="note">News mentioning players on your fantasy roster. Populates after the draft, once ESPN publishes your lineup.</p>
+    <div id="myBody"></div>
+  </section>
+
+  <section id="tab-news" class="panel">
+    <div class="leagues" id="newsPicker" role="group" aria-label="News league"></div>
+    <div id="newsBody"></div>
+  </section>
+
+  <section id="tab-hs" class="panel">
+    <div id="hsBody"></div>
+  </section>
+
+  <footer>
+    Pro, college and international data from ESPN. High school data scraped from GHSA.net,
+    the official source. Read-only.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   Sports Desk — scores, news, fantasy-player news, GHSA HS
+   ========================================================= */
+
+const BASE = "https://fantasy-football-taylor-ritchie-s-projects.vercel.app/api";
+const LEAGUE_ID = "1573934181";
+const MY_TEAM_ID = 16;
+
+// Ordered for Tayls' stated priorities: NFL/NCAAF/MLB/NBA/NHL first, then the
+// ones she "kind of pays attention to".
+const LEAGUES = [
+  ["nfl","NFL"], ["ncaaf","NCAA FB"], ["mlb","MLB"], ["nba","NBA"], ["nhl","NHL"],
+  ["ncaamb","NCAA MB"], ["wnba","WNBA"],
+  ["tennis","Tennis (ATP)"], ["tennisw","Tennis (WTA)"],
+  ["wcup","World Cup"], ["ucl","Champions Lg"], ["epl","EPL"], ["mls","MLS"],
+  ["olympics","Olympics"],
+];
+// Leagues that reliably carry a news feed.
+const NEWS_LEAGUES = [
+  ["nfl","NFL"], ["ncaaf","NCAA FB"], ["mlb","MLB"], ["nba","NBA"], ["nhl","NHL"],
+  ["wcup","World Cup"], ["olympics","Olympics"],
+];
+
+// Schools to surface on the HS tab. Only GHSA members can appear in GHSA data;
+// GSD and Unity Christian are tracked as links because they aren't GHSA football
+// members (GSD plays a deaf-schools circuit; Unity is in a private association).
+const HS_GHSA = [
+  { name:"Rome",       label:"Rome High (Wolves)", mine:true },
+  { name:"Model",      label:"Model" },
+  { name:"Pepperell",  label:"Pepperell" },
+  { name:"Armuchee",   label:"Armuchee" },
+  { name:"Coosa",      label:"Coosa" },
+  { name:"Darlington", label:"Darlington" },
+];
+const HS_LINKONLY = [
+  { label:"Georgia School for the Deaf (Tigers)",
+    why:"Plays other deaf schools, not a GHSA football region — no GHSA data.",
+    url:"https://www.maxpreps.com/ga/cave-spring/georgia-school-for-the-deaf-tigers/football/" },
+  { label:"Unity Christian",
+    why:"Private association, not GHSA football.",
+    url:"https://www.maxpreps.com/ga/rome/unity-christian-lions/football/" },
+];
+
+let ui = { tab:"scores", league:"nfl", newsLeague:"nfl" };
+const cache = {};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const setStatus = (m, e) => { $("status").textContent = m; $("status").className = e ? "err" : ""; };
+
+async function api(path){
+  const res = await fetch(BASE + path, { signal: AbortSignal.timeout(15000) });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = (json && (json.error || json.hint)) || ("HTTP " + res.status);
+    throw new Error(msg);
+  }
+  return json;
+}
+
+/* ---------- scores ---------- */
+
+function renderLeaguePickers(){
+  $("lgPicker").innerHTML = LEAGUES.map(([k,l]) =>
+    '<button class="lg" data-lg="' + k + '" aria-pressed="' + (k===ui.league) + '">' + esc(l) + "</button>").join("");
+  $("newsPicker").innerHTML = NEWS_LEAGUES.map(([k,l]) =>
+    '<button class="lg" data-nlg="' + k + '" aria-pressed="' + (k===ui.newsLeague) + '">' + esc(l) + "</button>").join("");
+}
+
+function competitorRow(c, winnerKnown){
+  const t = c.team || {};
+  const nm = t.shortDisplayName || t.displayName || t.name || c.athlete && c.athlete.displayName || "—";
+  const logo = t.logo ? '<img src="' + esc(t.logo) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : "";
+  const lose = winnerKnown && c.winner === false ? " lose" : "";
+  const rec = (c.records && c.records[0] && c.records[0].summary) ? c.records[0].summary : "";
+  return '<div class="trow' + lose + '">' + logo +
+    '<span class="tn">' + esc(nm) + (rec ? ' <span class="mono" style="color:var(--dim);font-size:0.75rem">' + esc(rec) + "</span>" : "") + "</span>" +
+    '<span class="sc">' + esc(c.score != null ? c.score : "—") + "</span></div>";
+}
+
+function renderScores(json){
+  const events = (json && json.events) || [];
+  if (!events.length){
+    $("scoreBody").innerHTML = '<p class="empty">No games listed right now — likely out of season or an off day for this league.</p>';
+    return;
+  }
+  const cards = events.map(ev => {
+    const comp = (ev.competitions && ev.competitions[0]) || {};
+    const st = (ev.status && ev.status.type) || {};
+    const live = st.state === "in";
+    const done = st.completed === true;
+    const label = st.shortDetail || st.detail || st.description || "";
+    const comps = comp.competitors || [];
+    // ESPN lists home first; show away on top to read like a scoreboard.
+    const ordered = comps.slice().sort((a,b) =>
+      (a.homeAway === "home" ? 1 : 0) - (b.homeAway === "home" ? 1 : 0));
+    const rows = ordered.map(c => competitorRow(c, done)).join("") ||
+      '<div class="trow"><span class="tn">' + esc(ev.name || "—") + "</span></div>";
+    return '<div class="game">' +
+      '<div class="gstate' + (live ? " live" : "") + '">' + esc(label) + "</div>" + rows + "</div>";
+  }).join("");
+  $("scoreBody").innerHTML = '<div class="sgrid">' + cards + "</div>";
+}
+
+async function loadScores(){
+  setStatus("loading scores…");
+  $("scoreBody").innerHTML = '<p class="empty">Loading…</p>';
+  try {
+    const json = await api("/scores?league=" + encodeURIComponent(ui.league));
+    cache["s:" + ui.league] = json;
+    renderScores(json);
+    setStatus("live · " + new Date().toLocaleTimeString());
+  } catch (err){
+    $("scoreBody").innerHTML = '<p class="err">' + esc(err.message) + "</p>";
+    setStatus("scores failed", true);
+  }
+}
+
+/* ---------- news ---------- */
+
+function newsCards(articles, tagFor){
+  return articles.map(a => {
+    const link = (a.links && a.links.web && a.links.web.href) || "";
+    const when = a.published ? new Date(a.published).toLocaleDateString() : "";
+    const tag = tagFor ? tagFor(a) : "";
+    return '<div class="newsitem">' +
+      "<h4>" + tag + (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener">' + esc(a.headline || "—") + "</a>"
+                           : esc(a.headline || "—")) + "</h4>" +
+      '<div class="meta">' + esc(when) + (a.type ? " · " + esc(a.type) : "") + "</div>" +
+      (a.description ? "<p>" + esc(a.description) + "</p>" : "") + "</div>";
+  }).join("");
+}
+
+async function loadNews(){
+  setStatus("loading news…");
+  $("newsBody").innerHTML = '<p class="empty">Loading…</p>';
+  try {
+    const json = await api("/scores?kind=news&league=" + encodeURIComponent(ui.newsLeague));
+    const arts = (json && json.articles) || [];
+    cache["n:" + ui.newsLeague] = arts;
+    $("newsBody").innerHTML = arts.length ? newsCards(arts)
+      : '<p class="empty">No articles returned for this league right now.</p>';
+    setStatus("live · " + new Date().toLocaleTimeString());
+  } catch (err){
+    $("newsBody").innerHTML = '<p class="err">' + esc(err.message) + "</p>";
+    setStatus("news failed", true);
+  }
+}
+
+/* ---------- my fantasy players ---------- */
+
+// Rosters live inside schedule entries, not teams[] — same quirk as league.html.
+function myRosterNames(league){
+  const names = [];
+  for (const m of (league.schedule || [])){
+    for (const side of ["home","away"]){
+      const s = m[side];
+      if (!s || s.teamId !== MY_TEAM_ID) continue;
+      const entries = s.rosterForCurrentScoringPeriod && s.rosterForCurrentScoringPeriod.entries;
+      for (const e of (entries || [])){
+        const pl = e.playerPoolEntry && e.playerPoolEntry.player;
+        if (pl && pl.fullName) names.push(pl.fullName);
+      }
+    }
+  }
+  return [...new Set(names)];
+}
+
+// Loose match: last name plus first initial, so "P. Mahomes" and
+// "Patrick Mahomes" both hit, without matching every "Smith" in the league.
+function mentions(text, fullName){
+  if (!text || !fullName) return false;
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return false;
+  const last = parts[parts.length - 1].replace(/[^A-Za-z'-]/g, "");
+  const first = parts[0];
+  if (last.length < 3) return false;
+  const t = text.toLowerCase();
+  if (!t.includes(last.toLowerCase())) return false;
+  return t.includes(first.toLowerCase()) || t.includes((first[0] + ". " + last).toLowerCase());
+}
+
+async function loadMyPlayers(){
+  setStatus("loading your players…");
+  $("myBody").innerHTML = '<p class="empty">Loading…</p>';
+  try {
+    const [league, news] = await Promise.all([
+      api("/league?leagueId=" + LEAGUE_ID),
+      api("/scores?kind=news&league=nfl"),
+    ]);
+    const names = myRosterNames(league);
+    if (!names.length){
+      $("myBody").innerHTML = '<p class="empty">No roster yet — ESPN publishes your lineup after the draft (Sat, Aug 30). ' +
+        "Once it does, any NFL news mentioning your players shows up here automatically.</p>";
+      setStatus("no roster yet");
+      return;
+    }
+    const arts = (news && news.articles) || [];
+    const hits = [];
+    for (const a of arts){
+      const blob = [a.headline, a.description].filter(Boolean).join(" ");
+      const who = names.filter(n => mentions(blob, n));
+      if (who.length) hits.push({ a, who });
+    }
+    let html = '<p class="note">' + names.length + " players on your roster · " +
+      arts.length + " NFL articles scanned · " + hits.length + " mention your guys.</p>";
+    html += hits.length
+      ? hits.map(h => newsCards([h.a], () =>
+          h.who.map(w => '<span class="tag">' + esc(w) + "</span>").join(""))).join("")
+      : '<p class="empty">Nothing in the current NFL news cycle mentions your roster. Check back — this refreshes with ESPN.</p>';
+    $("myBody").innerHTML = html;
+    setStatus("live · " + new Date().toLocaleTimeString());
+  } catch (err){
+    $("myBody").innerHTML = '<p class="err">' + esc(err.message) + "</p>";
+    setStatus("player news failed", true);
+  }
+}
+
+/* ---------- high school ---------- */
+
+const norm = s => String(s || "").toLowerCase().replace(/[^a-z]/g, "");
+function isWatched(school){
+  const n = norm(school);
+  return HS_GHSA.find(h => n === norm(h.name) || n.startsWith(norm(h.name)));
+}
+
+async function loadHS(){
+  setStatus("loading GHSA…");
+  $("hsBody").innerHTML = '<p class="empty">Loading…</p>';
+  const linkBlock =
+    '<h3 class="divlabel">Not in GHSA football</h3>' +
+    HS_LINKONLY.map(x =>
+      '<div class="newsitem"><h4>' + esc(x.label) + "</h4>" +
+      '<div class="meta">' + esc(x.why) + "</div>" +
+      '<div class="linkrow"><a href="' + esc(x.url) + '" target="_blank" rel="noopener">Schedule &amp; scores ↗</a></div></div>').join("");
+
+  try {
+    const json = await api("/ghsa?view=scores");
+    const games = (json && json.games) || [];
+    const mine = [], region = [];
+    for (const g of games){
+      const hitH = isWatched(g.home), hitA = isWatched(g.away);
+      if (hitH || hitA) mine.push({ g, who: (hitH || hitA) });
+    }
+    // Rome's own region, for standings-ish context
+    const romeGame = mine.find(m => m.who && m.who.mine);
+    const romeRegion = romeGame ? romeGame.g.region : null;
+    if (romeRegion) for (const g of games) if (g.region === romeRegion) region.push(g);
+
+    const gameRow = g => {
+      const hw = g.homeScore > g.awayScore, aw = g.awayScore > g.homeScore;
+      const mark = s => isWatched(s) ? ' style="color:var(--home);font-weight:600"' : "";
+      return "<tr>" +
+        "<td" + mark(g.home) + ">" + esc(g.home) + "</td>" +
+        '<td class="num"' + (hw ? ' style="color:var(--ok)"' : "") + ">" + g.homeScore + "</td>" +
+        "<td" + mark(g.away) + ">" + esc(g.away) + "</td>" +
+        '<td class="num"' + (aw ? ' style="color:var(--ok)"' : "") + ">" + g.awayScore + "</td>" +
+        '<td class="num" style="color:var(--dim)">' + esc(g.date || "") + "</td></tr>";
+    };
+    const head = '<thead><tr><th>Home</th><th class="num"></th><th>Away</th><th class="num"></th><th class="num">Date</th></tr></thead>';
+
+    let html = '<p class="note">Week of ' + esc(json.week || "?") + " · " + games.length +
+      ' games parsed from <a href="' + esc(json.source) + '" target="_blank" rel="noopener">GHSA.net</a>.</p>';
+
+    html += '<h3 class="divlabel">Rome &amp; Floyd County</h3>';
+    html += mine.length
+      ? "<table>" + head + "<tbody>" + mine.map(m => gameRow(m.g)).join("") + "</tbody></table>"
+      : '<p class="empty">None of your schools appear in this week\'s results.</p>';
+
+    if (region.length > 1){
+      html += '<h3 class="divlabel">Rome\'s region — ' + esc(romeRegion) + "</h3>";
+      html += "<table>" + head + "<tbody>" + region.map(gameRow).join("") + "</tbody></table>";
+    }
+    html += linkBlock;
+    $("hsBody").innerHTML = html;
+    setStatus("live · " + new Date().toLocaleTimeString());
+  } catch (err){
+    $("hsBody").innerHTML =
+      '<p class="err">GHSA scrape failed: ' + esc(err.message) + "</p>" +
+      '<p class="note">This is the fragile part of the app by design — it parses GHSA.net\'s HTML, ' +
+      "so an offseason gap or a site redesign will land here. The links below always work.</p>" +
+      '<div class="linkrow">' +
+      '<a href="https://www.ghsa.net/football" target="_blank" rel="noopener">GHSA Football ↗</a>' +
+      '<a href="https://www.ghsa.net/schedule-ranking-view" target="_blank" rel="noopener">Post-Season Rankings ↗</a>' +
+      "</div>" + linkBlock;
+    setStatus("GHSA unavailable", true);
+  }
+}
+
+/* ---------- tabs ---------- */
+
+const LOADERS = { scores: loadScores, myteam: loadMyPlayers, news: loadNews, hs: loadHS };
+const loaded = {};
+
+function showTab(t){
+  ui.tab = t;
+  document.querySelectorAll(".tab").forEach(b =>
+    b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  document.querySelectorAll(".panel").forEach(p =>
+    p.classList.toggle("active", p.id === "tab-" + t));
+  if (!loaded[t]) { loaded[t] = true; LOADERS[t](); }
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.tab) return showTab(b.dataset.tab);
+  if (b.dataset.lg){
+    ui.league = b.dataset.lg; renderLeaguePickers(); loadScores(); return;
+  }
+  if (b.dataset.nlg){
+    ui.newsLeague = b.dataset.nlg; renderLeaguePickers(); loadNews(); return;
+  }
+  if (b.id === "reloadBtn"){ loaded[ui.tab] = true; LOADERS[ui.tab](); return; }
+});
+
+/* ---------- self-tests ---------- */
+function runSelfTests(){
+  const t = (n,c) => console[c?"log":"error"]((c?"✓":"✗ FAIL") + " " + n);
+  t("esc", esc('<b>&"') === "&lt;b&gt;&amp;&quot;");
+  t("norm", norm("Rome ") === "rome" && norm("St. Mary's") === "stmarys");
+  t("isWatched Rome", !!isWatched("Rome"));
+  t("isWatched miss", !isWatched("Kennesaw Mountain"));
+  t("mentions full", mentions("Jahmyr Gibbs runs wild", "Jahmyr Gibbs"));
+  t("mentions initial", mentions("J. Gibbs injured", "Jahmyr Gibbs"));
+  t("mentions no false hit", !mentions("Ja'Marr Chase scores", "Jahmyr Gibbs"));
+  t("mentions guards short", !mentions("anything", "Bo"));
+}
+
+renderLeaguePickers();
+runSelfTests();
+showTab("scores");
+</script>
+</body>
+</html>
