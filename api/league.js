@@ -3,12 +3,13 @@ export default async function handler(req, res) {
   // send Access-Control-Allow-Origin, so a direct browser fetch is blocked.
   // This proxies server-to-server and re-adds the header.
   //
-  // Public-league only for now: no espn_s2/SWID cookie auth. If the league
-  // is ever switched to private, those cookies must be added as Vercel
-  // environment variables (Settings -> Environment Variables), NEVER hardcoded
-  // here or passed through the client. This function would then read
-  // process.env.ESPN_S2 / process.env.ESPN_SWID and forward them as a
-  // Cookie header on the upstream fetch below.
+  // The league returned HTTP 401 AUTH_LEAGUE_NOT_VISIBLE without cookies, so
+  // despite league settings, ESPN requires authenticated access here. This
+  // function now forwards espn_s2/SWID as a Cookie header IF they're present
+  // as Vercel environment variables (Settings -> Environment Variables on the
+  // fantasy-football project). They are never hardcoded here, never accepted
+  // as a query param, and never logged. If they're not set, the proxy still
+  // attempts the request unauthenticated (harmless — ESPN just 401s again).
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
@@ -27,21 +28,24 @@ export default async function handler(req, res) {
 
   // mTeam: team names/records · mRoster: full rosters · mMatchup: weekly matchups
   // mStandings: standings/rank · mSettings: league name, scoring, roster slots
-  //
-  // Host is lm-api-reads.fantasy.espn.com, NOT fantasy.espn.com — ESPN moved
-  // the API subdomain at some point in 2024/2025. The old host still resolves
-  // and returns HTTP 200, but serves the generic fantasy.espn.com marketing
-  // page instead of JSON, which is a confusing silent failure if you don't
-  // know to check for it.
   const views = ['mTeam', 'mRoster', 'mMatchup', 'mStandings', 'mSettings'];
   const upstreamUrl =
     `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${leagueId}` +
     '?' + views.map(v => `view=${v}`).join('&');
 
+  const fetchHeaders = { 'Accept': 'application/json' };
+  const espnS2 = process.env.ESPN_S2;
+  const espnSwid = process.env.ESPN_SWID;
+  const hasAuth = Boolean(espnS2 && espnSwid);
+  if (hasAuth) {
+    // SWID must keep its curly braces exactly as ESPN issues it.
+    fetchHeaders['Cookie'] = `espn_s2=${espnS2}; SWID=${espnSwid}`;
+  }
+
   try {
     const upstream = await fetch(upstreamUrl, {
       signal: AbortSignal.timeout(12000),
-      headers: { 'Accept': 'application/json' },
+      headers: fetchHeaders,
     });
 
     const contentType = upstream.headers.get('content-type') || '';
@@ -50,8 +54,11 @@ export default async function handler(req, res) {
     if (!upstream.ok) {
       res.status(upstream.status).json({
         error: `ESPN responded HTTP ${upstream.status}`,
-        hint: upstream.status === 401 || upstream.status === 403
-          ? 'League may be private. Public-league mode only is supported right now — see comment at top of this file.'
+        authConfigured: hasAuth,
+        hint: (upstream.status === 401 || upstream.status === 403)
+          ? (hasAuth
+              ? 'Cookies are set but ESPN still rejected the request — they may be expired or copied incorrectly. Re-grab espn_s2/SWID from a logged-in browser session.'
+              : 'League requires authenticated access. Set ESPN_S2 and ESPN_SWID as environment variables on this Vercel project, then redeploy.')
           : undefined,
         body: rawText.slice(0, 500) || undefined,
       });
@@ -59,13 +66,10 @@ export default async function handler(req, res) {
     }
 
     if (!contentType.includes('application/json')) {
-      // ESPN returned 200 but not JSON — usually a login wall or bot-check page.
-      // Surface the raw response instead of a generic parse-error message.
       res.status(502).json({
-        error: 'ESPN returned a non-JSON response (likely a login page or bot check)',
+        error: 'ESPN returned a non-JSON response',
         contentType,
         bodyPreview: rawText.slice(0, 800),
-        hint: 'If bodyPreview looks like an HTML login page, this league likely needs espn_s2/SWID cookie auth even though it may show as "public" in league settings — that would mean switching this proxy to private-league mode.',
       });
       return;
     }
