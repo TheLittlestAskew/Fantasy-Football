@@ -33,19 +33,48 @@ export default async function handler(req, res) {
     '?' + views.map(v => `view=${v}`).join('&');
 
   try {
-    const upstream = await fetch(upstreamUrl, { signal: AbortSignal.timeout(12000) });
+    const upstream = await fetch(upstreamUrl, {
+      signal: AbortSignal.timeout(12000),
+      headers: { 'Accept': 'application/json' },
+    });
+
+    const contentType = upstream.headers.get('content-type') || '';
+    const rawText = await upstream.text();
+
     if (!upstream.ok) {
-      const bodyText = await upstream.text().catch(() => '');
       res.status(upstream.status).json({
         error: `ESPN responded HTTP ${upstream.status}`,
         hint: upstream.status === 401 || upstream.status === 403
           ? 'League may be private. Public-league mode only is supported right now — see comment at top of this file.'
           : undefined,
-        body: bodyText.slice(0, 500) || undefined,
+        body: rawText.slice(0, 500) || undefined,
       });
       return;
     }
-    const data = await upstream.json();
+
+    if (!contentType.includes('application/json')) {
+      // ESPN returned 200 but not JSON — usually a login wall or bot-check page.
+      // Surface the raw response instead of a generic parse-error message.
+      res.status(502).json({
+        error: 'ESPN returned a non-JSON response (likely a login page or bot check)',
+        contentType,
+        bodyPreview: rawText.slice(0, 800),
+        hint: 'If bodyPreview looks like an HTML login page, this league likely needs espn_s2/SWID cookie auth even though it may show as "public" in league settings — that would mean switching this proxy to private-league mode.',
+      });
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      res.status(502).json({
+        error: 'ESPN response had a JSON content-type but failed to parse',
+        bodyPreview: rawText.slice(0, 800),
+      });
+      return;
+    }
+
     res.status(200).json(data);
   } catch (err) {
     res.status(502).json({ error: err && err.message ? err.message : 'Proxy fetch to ESPN failed' });
