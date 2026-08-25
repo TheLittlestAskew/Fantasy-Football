@@ -11,9 +11,9 @@ actionable weekly read: who to start, who to sit, and who's worth claiming.
 ## League facts (verified 2026-08-25, do not guess these)
 
 - League ID: `1573934181` — "INSPIRED FANTASY FOOTBALL"
-- Tayls' team ID: **16** ("Hits Different"). **Not 17** — that's another owner's
-  team. A prior session got this wrong; re-verify against the API before ever
-  changing it.
+- Tayls' team ID: **16** ("Hits Different", abbrev TNT). **Not 17** — that's
+  another owner's team ("Goldfish Bowl"). A prior session got this wrong;
+  re-verify against the API before ever changing it.
 - 20 teams, snake, PPR, H2H points, **private** (cookie auth required).
 - **IDP league**: 2 DP slots plus 7 bench, 2 IR, 2 FLEX. Defensive players
   (DL/LB/DB) count — don't treat this as offense-only.
@@ -34,19 +34,35 @@ The response gives you, in one shot:
 - `freeAgents[]` — sorted by projection, with `percentOwned`
 - `teams[]` — names and records, for naming the opponent
 
-## Step 2 — check for the known failure modes first
+## Step 2 — gate checks, in order. Do not skip to Step 3.
 
-Handle these before analysing anything:
+**`rosterCount` is NOT a valid signal for whether there's anything to advise on.**
+ESPN pre-populates a placeholder roster before the draft — Tayls' team showed
+12 names with `drafted: false` and every `projected` null. An earlier version of
+this skill keyed the pre-draft guard on `rosterCount === 0`, which never fired,
+and a careless run would have produced confident advice out of null-vs-null
+comparisons. Gate on the following instead:
 
-- **`error` mentions 401 / cookies** → the ESPN cookies expired. Tell Tayls to
-  re-grab `espn_s2` and `SWID` from a logged-in browser and update them in
-  Vercel → fantasy-football → Settings → Environment Variables. Stop there.
-- **`error` mentions ESPN_S2 / ESPN_SWID not set** → the env vars were never
-  added. Same fix, same place. Stop there.
-- **`rosterCount` is 0 and `drafted` is false** → the draft hasn't happened yet.
-  Say so plainly; there is nothing to advise on. Stop there.
-- **`faError` present** → roster analysis is still valid, but say the free-agent
-  half is unavailable rather than silently omitting it.
+1. **`error` mentions 401 / cookies** → ESPN cookies expired. Tell Tayls to
+   re-grab `espn_s2` and `SWID` from a logged-in browser and update them in
+   Vercel → fantasy-football → Settings → Environment Variables. **Stop.**
+2. **`error` mentions ESPN_S2 / ESPN_SWID not set** → env vars missing. Same
+   fix, same place. **Stop.**
+3. **`drafted` is `false`** → the draft hasn't happened. Say so plainly, name
+   the draft date, and stop. Any roster present is a placeholder. **Stop.**
+   You may list the placeholder names *if* you label them as such, but give no
+   start/sit or waiver advice.
+4. **Every `projected` in `starters[]` is null** → projections aren't published
+   yet (common in preseason, or if ESPN hasn't set the scoring period). Report
+   injuries and empty slots only; say projections are unavailable and give no
+   ranked advice. **Stop before Step 3's comparisons.**
+5. **Sanity check the free-agent pool**: if `freeAgents` contains obvious
+   league-winners at very high `percentOwned` (a 99%-owned starting QB sitting
+   free), the pool is unclaimed — i.e. pre-draft. Treat as case 3. **Stop.**
+6. **`faError` present** → roster analysis is still valid, but say the
+   free-agent half is unavailable rather than silently omitting it.
+
+Only if none of the above fire, continue.
 
 ## Step 3 — analyse
 
@@ -57,7 +73,8 @@ Start/sit:
 3. For each starter, look for a **bench** player who (a) has that starter's slot
    in their `eligibleSlots` and (b) has a meaningfully higher `projected` —
    more than ~2 points. Under that, projections are noise; don't recommend a
-   swap on a rounding difference.
+   swap on a rounding difference. **Skip any comparison where either side's
+   `projected` is null** — a null is not a zero and not a low score.
 4. Note empty starting slots (a slot in the lineup with no player).
 
 Waivers:
@@ -80,7 +97,8 @@ projected total — don't invent problems to fill sections.
 
 Be honest about what projections are: ESPN's numbers, not predictions Claude
 endorses. Never present a projection as a certainty, and never tell her a
-lineup guarantees a win.
+lineup guarantees a win. Mark inferences (e.g. "this looks like a placeholder
+roster") as inference, not as something the API stated.
 
 ## Notes
 
@@ -89,3 +107,6 @@ lineup guarantees a win.
   implemented.
 - The proxy is `api/advice.js` in `TheLittlestAskew/Fantasy-Football`, deployed
   automatically to Vercel on push to `main`.
+- **Install location matters.** Claude Code only discovers
+  `~/.claude/skills/<name>/SKILL.md`. A bare `~/.claude/skills/fantasy check.md`
+  (space, no folder) is invisible and `/fantasy-check` will silently not exist.
