@@ -77,9 +77,11 @@
   th,td{text-align:left; padding:0.45rem 0.5rem; border-bottom:1px solid var(--line)}
   th{color:var(--dim); font-weight:600; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em}
   td.num,th.num{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+  td.cls{font-family:"IBM Plex Mono",monospace; font-size:0.76rem; color:var(--dim); white-space:nowrap}
   tr.mine{background:oklch(0.63 0.19 35 / 0.10)}
   tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   .divlabel{margin:1.1rem 0 0.4rem; font-size:0.95rem; color:var(--accent-2)}
+  .divlabel .sub{color:var(--dim); font-size:0.8rem; font-weight:400}
   .empty{color:var(--dim); padding:0.8rem 0}
   .linkrow{display:flex; flex-wrap:wrap; gap:0.4rem; margin:0.5rem 0 0}
   .linkrow a{
@@ -141,8 +143,6 @@ const BASE = "https://fantasy-football-taylor-ritchie-s-projects.vercel.app/api"
 const LEAGUE_ID = "1573934181";
 const MY_TEAM_ID = 16;
 
-// Ordered for Tayls' stated priorities: NFL/NCAAF/MLB/NBA/NHL first, then the
-// ones she "kind of pays attention to".
 const LEAGUES = [
   ["nfl","NFL"], ["ncaaf","NCAA FB"], ["mlb","MLB"], ["nba","NBA"], ["nhl","NHL"],
   ["ncaamb","NCAA MB"], ["wnba","WNBA"],
@@ -150,15 +150,13 @@ const LEAGUES = [
   ["wcup","World Cup"], ["ucl","Champions Lg"], ["epl","EPL"], ["mls","MLS"],
   ["olympics","Olympics"],
 ];
-// Leagues that reliably carry a news feed.
 const NEWS_LEAGUES = [
   ["nfl","NFL"], ["ncaaf","NCAA FB"], ["mlb","MLB"], ["nba","NBA"], ["nhl","NHL"],
   ["wcup","World Cup"], ["olympics","Olympics"],
 ];
 
-// Schools to surface on the HS tab. Only GHSA members can appear in GHSA data;
-// GSD and Unity Christian are tracked as links because they aren't GHSA football
-// members (GSD plays a deaf-schools circuit; Unity is in a private association).
+// Only GHSA members can appear in GHSA data. GSD and Unity Christian are
+// link-only because they aren't GHSA football members.
 const HS_GHSA = [
   { name:"Rome",       label:"Rome High (Wolves)", mine:true },
   { name:"Model",      label:"Model" },
@@ -177,7 +175,6 @@ const HS_LINKONLY = [
 ];
 
 let ui = { tab:"scores", league:"nfl", newsLeague:"nfl" };
-const cache = {};
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -187,11 +184,34 @@ const setStatus = (m, e) => { $("status").textContent = m; $("status").className
 async function api(path){
   const res = await fetch(BASE + path, { signal: AbortSignal.timeout(15000) });
   const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = (json && (json.error || json.hint)) || ("HTTP " + res.status);
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error((json && (json.error || json.hint)) || ("HTTP " + res.status));
   return json;
+}
+
+/* ---------- GHSA region/class notation ----------
+   GHSA writes "{region}-{class}", which is genuinely easy to misread:
+   "7-A Division I" is REGION 7, CLASS A Div I — the SMALLEST schools —
+   not "Class 7A". Class is the letter count (AAAAA = 5A), region is the
+   leading number. These helpers keep that unambiguous in the UI.        */
+
+function parseRegion(raw){
+  const m = /^\s*(\d+)\s*-\s*(A+)(?:\s+DIVISION\s+(I{1,2}))?\s*$/i.exec(String(raw || ""));
+  if (!m) return null;
+  const region = parseInt(m[1], 10);
+  const aCount = m[2].length;
+  const div = m[3] ? m[3].toUpperCase() : null;
+  const cls = aCount === 1 ? ("A" + (div ? " Div " + div : "")) : (aCount + "A");
+  return { region, cls, aCount, div };
+}
+// "Class A Div I · Region 7"
+function formatRegion(raw){
+  const p = parseRegion(raw);
+  return p ? ("Class " + p.cls + " · Region " + p.region) : String(raw || "—");
+}
+// Compact for a table cell: "A Div I · R7"
+function shortRegion(raw){
+  const p = parseRegion(raw);
+  return p ? (p.cls + " · R" + p.region) : String(raw || "—");
 }
 
 /* ---------- scores ---------- */
@@ -205,7 +225,8 @@ function renderLeaguePickers(){
 
 function competitorRow(c, winnerKnown){
   const t = c.team || {};
-  const nm = t.shortDisplayName || t.displayName || t.name || c.athlete && c.athlete.displayName || "—";
+  const nm = t.shortDisplayName || t.displayName || t.name ||
+             (c.athlete && c.athlete.displayName) || "—";
   const logo = t.logo ? '<img src="' + esc(t.logo) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : "";
   const lose = winnerKnown && c.winner === false ? " lose" : "";
   const rec = (c.records && c.records[0] && c.records[0].summary) ? c.records[0].summary : "";
@@ -226,14 +247,12 @@ function renderScores(json){
     const live = st.state === "in";
     const done = st.completed === true;
     const label = st.shortDetail || st.detail || st.description || "";
-    const comps = comp.competitors || [];
-    // ESPN lists home first; show away on top to read like a scoreboard.
-    const ordered = comps.slice().sort((a,b) =>
+    const ordered = (comp.competitors || []).slice().sort((a,b) =>
       (a.homeAway === "home" ? 1 : 0) - (b.homeAway === "home" ? 1 : 0));
     const rows = ordered.map(c => competitorRow(c, done)).join("") ||
       '<div class="trow"><span class="tn">' + esc(ev.name || "—") + "</span></div>";
-    return '<div class="game">' +
-      '<div class="gstate' + (live ? " live" : "") + '">' + esc(label) + "</div>" + rows + "</div>";
+    return '<div class="game"><div class="gstate' + (live ? " live" : "") + '">' +
+      esc(label) + "</div>" + rows + "</div>";
   }).join("");
   $("scoreBody").innerHTML = '<div class="sgrid">' + cards + "</div>";
 }
@@ -242,9 +261,7 @@ async function loadScores(){
   setStatus("loading scores…");
   $("scoreBody").innerHTML = '<p class="empty">Loading…</p>';
   try {
-    const json = await api("/scores?league=" + encodeURIComponent(ui.league));
-    cache["s:" + ui.league] = json;
-    renderScores(json);
+    renderScores(await api("/scores?league=" + encodeURIComponent(ui.league)));
     setStatus("live · " + new Date().toLocaleTimeString());
   } catch (err){
     $("scoreBody").innerHTML = '<p class="err">' + esc(err.message) + "</p>";
@@ -259,9 +276,9 @@ function newsCards(articles, tagFor){
     const link = (a.links && a.links.web && a.links.web.href) || "";
     const when = a.published ? new Date(a.published).toLocaleDateString() : "";
     const tag = tagFor ? tagFor(a) : "";
-    return '<div class="newsitem">' +
-      "<h4>" + tag + (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener">' + esc(a.headline || "—") + "</a>"
-                           : esc(a.headline || "—")) + "</h4>" +
+    return '<div class="newsitem"><h4>' + tag +
+      (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener">' + esc(a.headline || "—") + "</a>"
+            : esc(a.headline || "—")) + "</h4>" +
       '<div class="meta">' + esc(when) + (a.type ? " · " + esc(a.type) : "") + "</div>" +
       (a.description ? "<p>" + esc(a.description) + "</p>" : "") + "</div>";
   }).join("");
@@ -273,7 +290,6 @@ async function loadNews(){
   try {
     const json = await api("/scores?kind=news&league=" + encodeURIComponent(ui.newsLeague));
     const arts = (json && json.articles) || [];
-    cache["n:" + ui.newsLeague] = arts;
     $("newsBody").innerHTML = arts.length ? newsCards(arts)
       : '<p class="empty">No articles returned for this league right now.</p>';
     setStatus("live · " + new Date().toLocaleTimeString());
@@ -302,8 +318,8 @@ function myRosterNames(league){
   return [...new Set(names)];
 }
 
-// Loose match: last name plus first initial, so "P. Mahomes" and
-// "Patrick Mahomes" both hit, without matching every "Smith" in the league.
+// Last name must appear, plus either the first name or "F. Last" — so
+// "P. Mahomes" hits without every "Smith" in the league matching.
 function mentions(text, fullName){
   if (!text || !fullName) return false;
   const parts = fullName.trim().split(/\s+/);
@@ -373,17 +389,16 @@ async function loadHS(){
   try {
     const json = await api("/ghsa?view=scores");
     const games = (json && json.games) || [];
-    const mine = [], region = [];
+    const mine = [];
     for (const g of games){
-      const hitH = isWatched(g.home), hitA = isWatched(g.away);
-      if (hitH || hitA) mine.push({ g, who: (hitH || hitA) });
+      const hit = isWatched(g.home) || isWatched(g.away);
+      if (hit) mine.push({ g, who: hit });
     }
-    // Rome's own region, for standings-ish context
     const romeGame = mine.find(m => m.who && m.who.mine);
     const romeRegion = romeGame ? romeGame.g.region : null;
-    if (romeRegion) for (const g of games) if (g.region === romeRegion) region.push(g);
+    const region = romeRegion ? games.filter(g => g.region === romeRegion) : [];
 
-    const gameRow = g => {
+    const gameRow = (g, withClass) => {
       const hw = g.homeScore > g.awayScore, aw = g.awayScore > g.homeScore;
       const mark = s => isWatched(s) ? ' style="color:var(--home);font-weight:600"' : "";
       return "<tr>" +
@@ -391,21 +406,26 @@ async function loadHS(){
         '<td class="num"' + (hw ? ' style="color:var(--ok)"' : "") + ">" + g.homeScore + "</td>" +
         "<td" + mark(g.away) + ">" + esc(g.away) + "</td>" +
         '<td class="num"' + (aw ? ' style="color:var(--ok)"' : "") + ">" + g.awayScore + "</td>" +
+        (withClass ? '<td class="cls">' + esc(shortRegion(g.region)) + "</td>" : "") +
         '<td class="num" style="color:var(--dim)">' + esc(g.date || "") + "</td></tr>";
     };
-    const head = '<thead><tr><th>Home</th><th class="num"></th><th>Away</th><th class="num"></th><th class="num">Date</th></tr></thead>';
+    const head = withClass => '<thead><tr><th>Home</th><th class="num"></th><th>Away</th>' +
+      '<th class="num"></th>' + (withClass ? "<th>Class</th>" : "") + '<th class="num">Date</th></tr></thead>';
 
     let html = '<p class="note">Week of ' + esc(json.week || "?") + " · " + games.length +
-      ' games parsed from <a href="' + esc(json.source) + '" target="_blank" rel="noopener">GHSA.net</a>.</p>';
+      ' games parsed from <a href="' + esc(json.source) + '" target="_blank" rel="noopener">GHSA.net</a>. ' +
+      "GHSA writes region-then-class, so <em>7-A Div I</em> means Region 7, Class A — the smallest schools, " +
+      "not “Class 7A”. Shown here as class first.</p>";
 
     html += '<h3 class="divlabel">Rome &amp; Floyd County</h3>';
     html += mine.length
-      ? "<table>" + head + "<tbody>" + mine.map(m => gameRow(m.g)).join("") + "</tbody></table>"
+      ? "<table>" + head(true) + "<tbody>" + mine.map(m => gameRow(m.g, true)).join("") + "</tbody></table>"
       : '<p class="empty">None of your schools appear in this week\'s results.</p>';
 
     if (region.length > 1){
-      html += '<h3 class="divlabel">Rome\'s region — ' + esc(romeRegion) + "</h3>";
-      html += "<table>" + head + "<tbody>" + region.map(gameRow).join("") + "</tbody></table>";
+      html += '<h3 class="divlabel">Rome\'s region <span class="sub">— ' +
+        esc(formatRegion(romeRegion)) + "</span></h3>";
+      html += "<table>" + head(false) + "<tbody>" + region.map(g => gameRow(g, false)).join("") + "</tbody></table>";
     }
     html += linkBlock;
     $("hsBody").innerHTML = html;
@@ -440,13 +460,9 @@ function showTab(t){
 document.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.tab) return showTab(b.dataset.tab);
-  if (b.dataset.lg){
-    ui.league = b.dataset.lg; renderLeaguePickers(); loadScores(); return;
-  }
-  if (b.dataset.nlg){
-    ui.newsLeague = b.dataset.nlg; renderLeaguePickers(); loadNews(); return;
-  }
-  if (b.id === "reloadBtn"){ loaded[ui.tab] = true; LOADERS[ui.tab](); return; }
+  if (b.dataset.lg){ ui.league = b.dataset.lg; renderLeaguePickers(); loadScores(); return; }
+  if (b.dataset.nlg){ ui.newsLeague = b.dataset.nlg; renderLeaguePickers(); loadNews(); return; }
+  if (b.id === "reloadBtn"){ LOADERS[ui.tab](); return; }
 });
 
 /* ---------- self-tests ---------- */
@@ -460,6 +476,13 @@ function runSelfTests(){
   t("mentions initial", mentions("J. Gibbs injured", "Jahmyr Gibbs"));
   t("mentions no false hit", !mentions("Ja'Marr Chase scores", "Jahmyr Gibbs"));
   t("mentions guards short", !mentions("anything", "Bo"));
+  // The notation that tripped us up: region number vs class letters.
+  t("region 7-A Div I", formatRegion("7-A DIVISION I") === "Class A Div I · Region 7");
+  t("region 5-AAAAA", formatRegion("5-AAAAA") === "Class 5A · Region 5");
+  t("region 6-AAAAAA", formatRegion("6-AAAAAA") === "Class 6A · Region 6");
+  t("region short", shortRegion("7-A DIVISION I") === "A Div I · R7");
+  t("region junk", formatRegion("not a region") === "not a region");
+  t("region null-safe", formatRegion(null) === "—");
 }
 
 renderLeaguePickers();
