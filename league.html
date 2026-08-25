@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>League · Inspired Fantasy Football</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Theme intentionally identical to index.html (War Room) so the two pages
+     read as one app. If you change the palette, change it in both. */
+  :root{
+    --bg:        oklch(0.18 0.015 285);
+    --surface:   oklch(0.22 0.018 285);
+    --surface-2: oklch(0.26 0.02 285);
+    --line:      oklch(0.32 0.02 285);
+    --text:      oklch(0.94 0.02 90);
+    --dim:       oklch(0.69 0.015 285);
+    --accent:    oklch(0.63 0.19 35);
+    --accent-ink:oklch(0.16 0.02 285);
+    --accent-2:  oklch(0.67 0.14 275);
+    --danger:    oklch(0.68 0.17 15);
+    --ok:        oklch(0.70 0.13 150);
+    --qb: oklch(0.62 0.13 20);  --rb: oklch(0.66 0.09 160);
+    --wr: oklch(0.66 0.12 275); --te: oklch(0.72 0.11 75);
+    --k:  oklch(0.64 0.02 280); --dst:oklch(0.60 0.06 45);
+    --idp:oklch(0.62 0.08 320);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    background-image:
+      linear-gradient(oklch(0.94 0.02 90 / 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.94 0.02 90 / 0.035) 1px, transparent 1px);
+    background-size:48px 48px;
+    font:400 15px/1.5 "IBM Plex Sans",sans-serif;
+    padding-bottom:4rem;
+  }
+  h1,h2,h3{font-family:Outfit,sans-serif; letter-spacing:-0.02em}
+  a{color:var(--accent-2)}
+  button{
+    font:600 14px "IBM Plex Sans",sans-serif; color:var(--text);
+    background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer; min-height:44px;
+  }
+  button:hover{background:var(--line)}
+  button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .mono{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+  .wrap{max-width:1200px; margin:0 auto; padding:0 0.75rem}
+
+  header.app{display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; padding:0.9rem 0 0.5rem}
+  header.app h1{font-size:1.35rem; margin:0}
+  #status{color:var(--dim); font-size:0.8rem; margin-left:auto}
+  .err{color:var(--danger)}
+
+  /* league meta strip */
+  #meta{
+    display:flex; flex-wrap:wrap; gap:0.4rem 1.5rem; align-items:baseline;
+    background:
+      linear-gradient(90deg, var(--accent), var(--accent-2)) top left / 100% 3px no-repeat,
+      var(--surface);
+    border:1px solid var(--line); border-radius:10px;
+    padding:0.75rem 0.9rem 0.6rem; margin:0.5rem 0 1rem;
+  }
+  #meta .big{font-family:Outfit,sans-serif; font-weight:700; font-size:1.15rem}
+  #meta .dim{color:var(--dim); font-size:0.85rem}
+  #meta .countdown{color:var(--accent); font-weight:600}
+
+  /* tabs */
+  .tabs{display:flex; gap:0.35rem; flex-wrap:wrap; margin:0 0 0.9rem}
+  .tab{padding:0.45rem 0.9rem; border-radius:999px}
+  .tab[aria-selected="true"]{background:var(--accent-2); color:var(--bg); border-color:transparent}
+  .panel{display:none}
+  .panel.active{display:block}
+
+  /* tables */
+  table{width:100%; border-collapse:collapse; font-size:0.9rem}
+  th,td{text-align:left; padding:0.5rem 0.5rem; border-bottom:1px solid var(--line)}
+  th{color:var(--dim); font-weight:600; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em}
+  td.num,th.num{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+  tr.me{background:oklch(0.63 0.19 35 / 0.10)}
+  tr.me td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+  .teamcell{display:flex; align-items:center; gap:0.55rem; min-width:0}
+  .teamcell img{width:26px; height:26px; border-radius:6px; object-fit:cover; background:var(--surface-2); flex:0 0 auto}
+  .teamcell .tn{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .teamcell .ow{color:var(--dim); font-size:0.78rem; white-space:nowrap}
+  .divlabel{margin:1.2rem 0 0.4rem; font-size:0.95rem; color:var(--accent-2)}
+
+  /* matchups */
+  .mgrid{display:grid; gap:0.6rem; grid-template-columns:1fr}
+  @media(min-width:760px){ .mgrid{grid-template-columns:1fr 1fr} }
+  .matchup{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0.7rem 0.85rem;
+  }
+  .matchup.hasme{border-color:var(--accent)}
+  .mrow{display:flex; align-items:center; gap:0.55rem; padding:0.25rem 0}
+  .mrow .tn{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .mrow .pts{font-family:"IBM Plex Mono",monospace; font-weight:600}
+  .mrow.win .pts{color:var(--ok)}
+  .mvs{color:var(--dim); font-size:0.72rem; text-align:center; padding:0.1rem 0}
+
+  /* rosters */
+  #rosterPick{margin:0 0 0.8rem}
+  select{
+    background:var(--surface); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:0.5rem 0.65rem; font:inherit; min-height:44px; max-width:100%;
+  }
+  .roster{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:0.6rem 0.85rem}
+  .slotrow{display:flex; align-items:center; gap:0.6rem; padding:0.35rem 0; border-bottom:1px solid var(--line)}
+  .slotrow:last-child{border-bottom:none}
+  .slotrow.bench{opacity:0.62}
+  .slotlab{
+    flex:0 0 3.4rem; font:600 0.7rem "IBM Plex Mono",monospace; color:var(--dim);
+    text-transform:uppercase;
+  }
+  .pos{
+    display:inline-block; font:600 0.7rem "IBM Plex Mono",monospace;
+    padding:0.1rem 0.4rem; border-radius:5px; color:var(--bg); flex:0 0 auto;
+  }
+  .pos-QB{background:var(--qb)} .pos-RB{background:var(--rb)} .pos-WR{background:var(--wr)}
+  .pos-TE{background:var(--te)} .pos-K{background:var(--k)}  .pos-DST{background:var(--dst)}
+  .pos-DL,.pos-LB,.pos-DB{background:var(--idp)}
+  .pname{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .inj{font:600 0.68rem "IBM Plex Mono",monospace; padding:0.05rem 0.3rem; border-radius:4px}
+  .inj.q{color:oklch(0.78 0.13 85)}
+  .inj.o{color:var(--danger)}
+  .empty{color:var(--dim); padding:0.8rem 0}
+  footer{color:var(--dim); font-size:0.75rem; padding:1.5rem 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <h1>League</h1>
+    <button id="reloadBtn">Reload</button>
+    <a href="./index.html" style="margin-left:0.25rem">← War Room</a>
+    <span id="status" role="status">loading…</span>
+  </header>
+
+  <div id="meta"><span class="dim">Loading league…</span></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="standings" aria-selected="true">Standings</button>
+    <button class="tab" role="tab" data-tab="matchups" aria-selected="false">Matchups</button>
+    <button class="tab" role="tab" data-tab="rosters" aria-selected="false">Rosters</button>
+  </div>
+
+  <section id="tab-standings" class="panel active"></section>
+  <section id="tab-matchups" class="panel"></section>
+  <section id="tab-rosters" class="panel">
+    <div id="rosterPick"></div>
+    <div id="rosterBody"></div>
+  </section>
+
+  <footer>
+    Live data from ESPN via this app's own proxy. Read-only — nothing here changes your league.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   League dashboard: standings / matchups / rosters
+   Reads api/league.js (Vercel proxy → ESPN private league API).
+   Single file, no build step, no persistence — always live.
+   ========================================================= */
+
+const LEAGUE_BASE = "https://fantasy-football-taylor-ritchie-s-projects.vercel.app/api/league";
+const LEAGUE_ID = "1573934181";
+// teamId 16 = "Hits Different" = Taylor Ritchie. Verified against live league
+// JSON (members[] → teams[] → pickOrder) on 2026-08-25. See HANDOFF.md.
+const MY_TEAM_ID = 16;
+
+// ESPN defaultPositionId → our label. This league runs IDP, so defensive
+// positions matter here (unlike the draft board, which is offense + DST only).
+const POS_MAP = {
+  1:"QB", 2:"RB", 3:"WR", 4:"TE", 5:"K", 16:"DST",
+  9:"DL", 10:"LB", 11:"DL", 12:"DB", 13:"DB", 14:"DB",
+};
+// ESPN lineupSlotId → label shown in the roster's left gutter.
+const SLOT_MAP = {
+  0:"QB", 1:"TQB", 2:"RB", 3:"RB/WR", 4:"WR", 5:"WR/TE", 6:"TE", 7:"OP",
+  8:"DT", 9:"DE", 10:"LB", 11:"DL", 12:"CB", 13:"S", 14:"DB", 15:"DP",
+  16:"D/ST", 17:"K", 18:"P", 19:"HC", 20:"BE", 21:"IR", 23:"FLEX",
+};
+const BENCH_SLOTS = new Set([20, 21]);
+
+let data = null;          // raw league JSON
+let ui = { tab: "standings", rosterTeam: MY_TEAM_ID };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+
+function seasonYear(){
+  const d = new Date();
+  return d.getMonth() < 2 ? d.getFullYear() - 1 : d.getFullYear();
+}
+
+/* ---------- derived lookups (each guards missing data) ---------- */
+
+function ownerName(team){
+  // Teams reference owners by GUID; the human name lives in members[].
+  if (!team || !data || !Array.isArray(data.members)) return "";
+  const guid = team.primaryOwner || (Array.isArray(team.owners) ? team.owners[0] : null);
+  if (!guid) return "";
+  const m = data.members.find(x => x.id === guid);
+  if (!m) return "";
+  const full = [m.firstName, m.lastName].filter(Boolean).join(" ").trim();
+  return full || m.displayName || "";
+}
+
+function teamsById(){
+  const map = new Map();
+  for (const t of (data && data.teams) || []) map.set(t.id, t);
+  return map;
+}
+
+function teamName(t){
+  return (t && typeof t.name === "string" && t.name.trim()) ? t.name.trim() : ("Team " + (t ? t.id : "?"));
+}
+
+function currentMatchupPeriod(){
+  // Prefer ESPN's own pointer; fall back to the lowest period that still has
+  // an undecided game, then to 1. Never returns null.
+  const s = data && data.status;
+  if (s && Number.isInteger(s.currentMatchupPeriod) && s.currentMatchupPeriod > 0) return s.currentMatchupPeriod;
+  const undecided = ((data && data.schedule) || []).filter(m => m.winner === "UNDECIDED");
+  if (undecided.length) return Math.min(...undecided.map(m => m.matchupPeriodId));
+  return 1;
+}
+
+function rostersByTeam(){
+  // Rosters are NOT on teams[] — ESPN only embeds them inside the schedule
+  // entries for the current scoring period. Walk the whole schedule and keep
+  // any roster we find, newest period wins.
+  const out = new Map();
+  const sched = (data && data.schedule) || [];
+  for (const m of sched){
+    for (const side of ["home", "away"]){
+      const s = m[side];
+      if (!s || !Number.isInteger(s.teamId)) continue;
+      const entries = s.rosterForCurrentScoringPeriod && Array.isArray(s.rosterForCurrentScoringPeriod.entries)
+        ? s.rosterForCurrentScoringPeriod.entries : null;
+      if (entries && entries.length) out.set(s.teamId, entries);
+    }
+  }
+  return out;
+}
+
+function divisionName(id){
+  const divs = data && data.settings && data.settings.scheduleSettings
+    ? data.settings.scheduleSettings.divisions : null;
+  if (!Array.isArray(divs)) return null;
+  const d = divs.find(x => x.id === id);
+  return d && d.name ? d.name.trim() : null;
+}
+
+/* ---------- fetch ---------- */
+
+async function loadLeague(){
+  setStatus("loading league…");
+  try {
+    const url = LEAGUE_BASE + "?leagueId=" + encodeURIComponent(LEAGUE_ID) + "&season=" + seasonYear();
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const json = await res.json();
+    if (!res.ok){
+      const msg = (json && (json.error || json.hint)) || ("HTTP " + res.status);
+      setStatus(msg, true);
+      $("meta").innerHTML = '<span class="err">' + esc(msg) + "</span>";
+      return;
+    }
+    if (!json || !Array.isArray(json.teams) || !json.teams.length){
+      setStatus("league loaded but contained no teams", true);
+      return;
+    }
+    data = json;
+    setStatus("live · " + new Date().toLocaleTimeString());
+    renderAll();
+  } catch (err){
+    const msg = "Could not load league: " + (err && err.message ? err.message : "network error");
+    setStatus(msg, true);
+    $("meta").innerHTML = '<span class="err">' + esc(msg) + "</span>";
+  }
+}
+
+function setStatus(msg, isErr){
+  $("status").textContent = msg;
+  $("status").className = isErr ? "err" : "";
+}
+
+/* ---------- render: meta strip ---------- */
+
+function renderMeta(){
+  const st = (data && data.settings) || {};
+  const name = st.name || "League";
+  const size = st.size || (data.teams || []).length;
+  const scoring = st.scoringSettings && st.scoringSettings.scoringType === "H2H_POINTS" ? "H2H points" : "";
+  const ppr = st.scoringSettings && st.scoringSettings.playerRankType === "PPR" ? "PPR" : "";
+  const dd = st.draftSettings && st.draftSettings.date ? new Date(st.draftSettings.date) : null;
+  const drafted = data.draftDetail && data.draftDetail.drafted;
+
+  const bits = [];
+  bits.push('<span class="big">' + esc(name) + "</span>");
+  bits.push('<span class="dim">' + size + " teams · " + esc([ppr, scoring].filter(Boolean).join(" · ")) + "</span>");
+
+  if (dd && !isNaN(dd.getTime())){
+    if (drafted){
+      bits.push('<span class="dim">Drafted ' + dd.toLocaleDateString() + "</span>");
+    } else {
+      const days = Math.ceil((dd.getTime() - Date.now()) / 86400000);
+      const when = dd.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" }) +
+                   " " + dd.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+      const cd = days > 1 ? ("in " + days + " days") : days === 1 ? "tomorrow" : days === 0 ? "today" : "";
+      bits.push('<span class="countdown">Draft ' + esc(when) + (cd ? " (" + cd + ")" : "") + "</span>");
+    }
+  }
+  const mp = currentMatchupPeriod();
+  bits.push('<span class="dim">Week ' + mp + "</span>");
+  $("meta").innerHTML = bits.join("");
+}
+
+/* ---------- render: standings ---------- */
+
+function standingsRow(t, rank){
+  const r = (t.record && t.record.overall) || { wins:0, losses:0, ties:0, pointsFor:0, pointsAgainst:0 };
+  const owner = ownerName(t);
+  const logo = t.logo
+    ? '<img src="' + esc(t.logo) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+    : '<img alt="">';
+  const rec = r.wins + "-" + r.losses + (r.ties ? "-" + r.ties : "");
+  return '<tr class="' + (t.id === MY_TEAM_ID ? "me" : "") + '">' +
+    '<td class="num">' + rank + "</td>" +
+    '<td><div class="teamcell">' + logo +
+      '<div style="min-width:0"><div class="tn">' + esc(teamName(t)) + "</div>" +
+      (owner ? '<div class="ow">' + esc(owner) + "</div>" : "") + "</div></div></td>" +
+    '<td class="num">' + rec + "</td>" +
+    '<td class="num">' + (r.pointsFor || 0).toFixed(1) + "</td>" +
+    '<td class="num">' + (r.pointsAgainst || 0).toFixed(1) + "</td>" +
+    "</tr>";
+}
+
+function sortTeams(list){
+  // Wins first, then points-for as the tiebreak (this league's playoff seeding
+  // rule is TOTAL_POINTS_SCORED, so points-for is the meaningful tiebreak).
+  return list.slice().sort((a, b) => {
+    const ra = (a.record && a.record.overall) || {}, rb = (b.record && b.record.overall) || {};
+    return (rb.wins || 0) - (ra.wins || 0) || (rb.pointsFor || 0) - (ra.pointsFor || 0);
+  });
+}
+
+function renderStandings(){
+  const teams = data.teams || [];
+  const divs = (data.settings && data.settings.scheduleSettings && data.settings.scheduleSettings.divisions) || [];
+  const head = '<thead><tr><th class="num">#</th><th>Team</th><th class="num">Rec</th>' +
+               '<th class="num">PF</th><th class="num">PA</th></tr></thead>';
+  let html = "";
+
+  if (divs.length > 1){
+    for (const d of divs){
+      const inDiv = sortTeams(teams.filter(t => t.divisionId === d.id));
+      if (!inDiv.length) continue;
+      html += '<h3 class="divlabel">' + esc((d.name || "Division").trim()) + "</h3>";
+      html += "<table>" + head + "<tbody>" +
+              inDiv.map((t, i) => standingsRow(t, i + 1)).join("") + "</tbody></table>";
+    }
+    html += '<h3 class="divlabel">League-wide</h3>';
+  }
+  const all = sortTeams(teams);
+  html += "<table>" + head + "<tbody>" +
+          all.map((t, i) => standingsRow(t, i + 1)).join("") + "</tbody></table>";
+  $("tab-standings").innerHTML = html;
+}
+
+/* ---------- render: matchups ---------- */
+
+function renderMatchups(){
+  const byId = teamsById();
+  const mp = currentMatchupPeriod();
+  const games = ((data.schedule) || []).filter(m => m.matchupPeriodId === mp);
+  if (!games.length){
+    $("tab-matchups").innerHTML = '<p class="empty">No matchups found for week ' + mp + ".</p>";
+    return;
+  }
+  const started = games.some(g =>
+    ((g.home && g.home.totalPoints) || 0) > 0 || ((g.away && g.away.totalPoints) || 0) > 0);
+
+  const cards = games.map(g => {
+    const h = byId.get(g.home && g.home.teamId), a = byId.get(g.away && g.away.teamId);
+    const hp = (g.home && g.home.totalPoints) || 0, ap = (g.away && g.away.totalPoints) || 0;
+    const mine = (g.home && g.home.teamId === MY_TEAM_ID) || (g.away && g.away.teamId === MY_TEAM_ID);
+    const hWin = started && hp > ap, aWin = started && ap > hp;
+    const row = (t, pts, win) =>
+      '<div class="mrow ' + (win ? "win" : "") + '">' +
+        '<span class="tn">' + esc(t ? teamName(t) : "—") + "</span>" +
+        '<span class="pts">' + (started ? pts.toFixed(1) : "—") + "</span></div>";
+    return '<div class="matchup ' + (mine ? "hasme" : "") + '">' +
+      row(a, ap, aWin) + '<div class="mvs">at</div>' + row(h, hp, hWin) + "</div>";
+  }).join("");
+
+  $("tab-matchups").innerHTML =
+    '<h3 class="divlabel">Week ' + mp + (started ? "" : " · not started") + "</h3>" +
+    '<div class="mgrid">' + cards + "</div>";
+}
+
+/* ---------- render: rosters ---------- */
+
+function renderRosterPicker(){
+  const teams = data.teams || [];
+  const opts = teams.slice()
+    .sort((a, b) => teamName(a).localeCompare(teamName(b)))
+    .map(t => '<option value="' + t.id + '"' + (t.id === ui.rosterTeam ? " selected" : "") + ">" +
+              esc(teamName(t)) + (t.id === MY_TEAM_ID ? "  (you)" : "") + "</option>").join("");
+  $("rosterPick").innerHTML = '<label class="dim" style="font-size:0.8rem">Team<br>' +
+    '<select id="rosterSel">' + opts + "</select></label>";
+  $("rosterSel").addEventListener("change", e => {
+    const v = parseInt(e.target.value, 10);
+    if (Number.isInteger(v)) { ui.rosterTeam = v; renderRosterBody(); }
+  });
+}
+
+function renderRosterBody(){
+  const rosters = rostersByTeam();
+  const entries = rosters.get(ui.rosterTeam);
+  if (!entries || !entries.length){
+    $("rosterBody").innerHTML = '<p class="empty">No roster data available for this team yet. ' +
+      "ESPN only publishes rosters once lineups are set for the current week" +
+      (data.draftDetail && !data.draftDetail.drafted ? ", which happens after the draft." : ".") + "</p>";
+    return;
+  }
+  // Starters first (in ESPN's slot order), bench and IR last.
+  const sorted = entries.slice().sort((a, b) => {
+    const ab = BENCH_SLOTS.has(a.lineupSlotId), bb = BENCH_SLOTS.has(b.lineupSlotId);
+    if (ab !== bb) return ab ? 1 : -1;
+    return (a.lineupSlotId || 0) - (b.lineupSlotId || 0);
+  });
+
+  const rows = sorted.map(e => {
+    const pl = e.playerPoolEntry && e.playerPoolEntry.player;
+    if (!pl) return "";
+    const pos = POS_MAP[pl.defaultPositionId] || "—";
+    const slot = SLOT_MAP[e.lineupSlotId] || "?";
+    const bench = BENCH_SLOTS.has(e.lineupSlotId);
+    const st = pl.injuryStatus;
+    let inj = "";
+    if (st === "QUESTIONABLE") inj = '<span class="inj q">Q</span>';
+    else if (st === "OUT") inj = '<span class="inj o">OUT</span>';
+    else if (st === "INJURY_RESERVE") inj = '<span class="inj o">IR</span>';
+    return '<div class="slotrow ' + (bench ? "bench" : "") + '">' +
+      '<span class="slotlab">' + esc(slot) + "</span>" +
+      '<span class="pos pos-' + pos + '">' + pos + "</span>" +
+      '<span class="pname">' + esc(pl.fullName || "—") + "</span>" + inj + "</div>";
+  }).join("");
+
+  $("rosterBody").innerHTML = '<div class="roster">' + rows + "</div>";
+}
+
+function renderRosters(){ renderRosterPicker(); renderRosterBody(); }
+
+/* ---------- tabs + boot ---------- */
+
+function renderAll(){
+  renderMeta();
+  renderStandings();
+  renderMatchups();
+  renderRosters();
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    ui.tab = btn.dataset.tab;
+    document.querySelectorAll(".tab").forEach(b =>
+      b.setAttribute("aria-selected", String(b.dataset.tab === ui.tab)));
+    document.querySelectorAll(".panel").forEach(p =>
+      p.classList.toggle("active", p.id === "tab-" + ui.tab));
+  });
+});
+$("reloadBtn").addEventListener("click", loadLeague);
+
+/* ---------- self-tests (console only) ---------- */
+function runSelfTests(){
+  const t = (n, c) => console[c ? "log" : "error"]((c ? "✓" : "✗ FAIL") + " " + n);
+  t("POS_MAP offense", POS_MAP[1] === "QB" && POS_MAP[3] === "WR" && POS_MAP[16] === "DST");
+  t("POS_MAP idp", POS_MAP[10] === "LB" && POS_MAP[13] === "DB");
+  t("SLOT_MAP flex/bench", SLOT_MAP[23] === "FLEX" && SLOT_MAP[20] === "BE");
+  t("bench set", BENCH_SLOTS.has(20) && BENCH_SLOTS.has(21) && !BENCH_SLOTS.has(0));
+  t("esc escapes", esc('<b>&"') === "&lt;b&gt;&amp;&quot;");
+  // currentMatchupPeriod must never throw or return null, even with no data
+  const saved = data; data = null;
+  t("matchupPeriod no data", currentMatchupPeriod() === 1);
+  data = { status: { currentMatchupPeriod: 4 } };
+  t("matchupPeriod from status", currentMatchupPeriod() === 4);
+  data = { schedule: [{ matchupPeriodId: 7, winner: "UNDECIDED" }, { matchupPeriodId: 9, winner: "UNDECIDED" }] };
+  t("matchupPeriod fallback", currentMatchupPeriod() === 7);
+  data = saved;
+}
+
+runSelfTests();
+loadLeague();
+</script>
+</body>
+</html>
