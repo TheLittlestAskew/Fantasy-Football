@@ -43,8 +43,17 @@ Handle these before analysing anything:
   Vercel → fantasy-football → Settings → Environment Variables. Stop there.
 - **`error` mentions ESPN_S2 / ESPN_SWID not set** → the env vars were never
   added. Same fix, same place. Stop there.
-- **`rosterCount` is 0 and `drafted` is false** → the draft hasn't happened yet.
-  Say so plainly; there is nothing to advise on. Stop there.
+- **`drafted` is false** → the draft hasn't happened yet. Say so plainly; there
+  is nothing to advise on. Stop there.
+  Do **not** gate this on `rosterCount`. ESPN reports a non-empty pre-draft
+  roster (keepers, prior-season leftovers, draft-queue entries) whose players
+  all carry `projected: null` — so a `rosterCount is 0` check silently passes
+  and Step 3 then ranks `null` against `null` and invents advice. Confirmed
+  2026-08-25: `drafted: false` with `rosterCount: 12`, every projection null,
+  and Josh Allen sitting in `freeAgents` at 99.9% owned.
+- **Every `projected` is `null`, or `projectedStarterTotal` is 0** → stop for the
+  same reason, even if `drafted` is true. Projections aren't published yet;
+  say so rather than ranking on absent data.
 - **`faError` present** → roster analysis is still valid, but say the free-agent
   half is unavailable rather than silently omitting it.
 
