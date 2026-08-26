@@ -3,11 +3,15 @@
 ## ▶ DO NEXT
 **Draft is Saturday, August 30, 2026** (confirmed via league settings `draftSettings.date`).
 
-**The only blocking item:** add two env vars in Vercel dashboard → fantasy-football project → Settings → Environment Variables, then redeploy (or push any trivial commit):
-- `ESPN_S2` = the espn_s2 cookie value (long string, no braces)
-- `ESPN_SWID` = the SWID cookie value, **including the curly braces** `{...}`
+✓ **The Vercel env vars are DONE.** `ESPN_S2` and `ESPN_SWID` are set on the
+fantasy-football project and authenticating. Verified live 2026-08-26:
+`GET /api/draft?leagueId=1573934181` → `HTTP 200`
+`{"drafted":false,"inProgress":false,"teams":20,"totalPicks":280,"picks":[]}`.
+`/api/advice` and `/api/league` authenticate off the same two vars. Nothing is
+blocking any more.
 
-Without these, both `api/draft.js` (live draft sync) and `api/league.js` (league dashboard) return a clear 500/401 rather than working. Everything else is built and verified.
+**Open item:** merge PR `fix/fantasy-check-predraft-guard` (branch pushed, PR
+needs opening by hand — the GitHub connector is read-only, see log).
 
 On draft day: open the War Room and click **ESPN Sync: Off** to turn it on — polls every 5s and auto-marks picks taken/mine.
 
@@ -23,6 +27,18 @@ Possible future work, nothing blocking: post-draft, re-check the league dashboar
 
 ## Log
 <!-- newest first. one entry per logical task/session. -->
+
+### 2026-08-26 12:35 ET · Claude Code
+- **Changed:** Ran `/fantasy-check` for the first time; fixed two things that stopped it working.
+  1. **The skill was undiscoverable.** It lived at `~/.claude/skills/fantasy check.md` — a space in the filename and a bare `.md`. Claude Code only registers `~/.claude/skills/<name>/SKILL.md`, so `/fantasy-check` silently did not exist. Copied the repo's canonical copy to `~/.claude/skills/fantasy-check/SKILL.md` (verified byte-identical apart from CRLF first) and deleted the stray. It registered immediately.
+  2. **Fixed a real logic bug in the skill's Step 2 pre-draft guard.** It bailed only when `rosterCount` is 0 **and** `drafted` is false. ESPN reports a non-empty pre-draft roster, so the guard never fired: observed `drafted: false` with `rosterCount: 12`, every rostered `projected` null, `projectedStarterTotal: 0`, and Josh Allen sitting in `freeAgents` at 99.9% owned. Step 3 would then have ranked `null` against `null` and emitted confident start/sit advice built on absent data. Now gates on `drafted` alone, plus a second stop for all-null projections after `drafted` flips true.
+  - Also confirmed the ESPN env vars are live and `/api/draft` returns 200 (see DO NEXT), and re-verified team 16 = "Hits Different" against `teams[]` — team 17 is "Goldfish Bowl", so the old ID error has not crept back.
+  - `/fantasy-check` result itself: nothing to advise on, draft is 4 days out. Week 1 opponent is team 3, "The Murderhobos".
+- **Commit:** `b9d1d49` (skills/fantasy-check/SKILL.md guard fix, on branch `fix/fantasy-check-predraft-guard`)
+- **Friction:** gen-fail — first `espn_s2` paste arrived truncated at 277 chars ending in a bare `%`; caught by checking length and tail *before* spending a deploy cycle. Copying from the DevTools **Cookie Value** detail pane (not the grid cell, which truncates) gave 336 chars ending `%3D`, which ESPN accepted with a 200. Always length-check and tail-check a pasted `espn_s2` against ESPN directly before pushing it anywhere.
+- **Friction:** gen-fail — the GitHub MCP connector is **read-only**: `403 Resource not accessible by integration` on both `create_branch` and `create_pull_request`. `git push` over HTTPS works fine (Git Credential Manager has a write-scoped token), so the branch is up, but the PR itself has to be opened in the browser. `gh` is not installed on this machine — installing it would fix PR creation from Claude Code.
+- **Next:** Open and merge the PR for `fix/fantasy-check-predraft-guard`, then re-run `/fantasy-check` on draft day.
+- **Watch out:** This session started from a task doc saying the ESPN env vars still needed setting. They were already set — commit `59721e9` landed mid-session from another surface and `/api/draft` flipped from 500 to 200 underneath us. Roughly half an hour went into staging work that was already done. **Probe the live endpoint before acting on a stale DO NEXT block**, since this repo gets edited from several surfaces on the same day.
 
 ### 2026-08-25 · Claude chat (fourth session — league dashboard)
 - **Changed:** Built `league.html`, the season-long league dashboard, consuming the `api/league.js` proxy added earlier the same day. Three tabs:
