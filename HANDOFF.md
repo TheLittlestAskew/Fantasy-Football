@@ -7,16 +7,45 @@ was pasted in plain text into a Claude Code transcript and is still a valid
 session credential for her ESPN account. Fix: log out of ESPN, log back in
 (this invalidates the old cookie and issues a new one), then update `ESPN_S2`
 in Vercel → fantasy-football → Settings → Environment Variables. Flagged
-2026-08-25, **not yet confirmed done.**
+2026-08-25, **still not confirmed done as of 2026-08-29.** Note the cookie was
+verified live and working on 2026-08-29, which confirms it has *not* been
+rotated — a rotation would have invalidated it.
 
-**Draft is Saturday, August 30, 2026.** On draft day: open the War Room and
-click **ESPN Sync: Off** to turn it on — polls every 5s and auto-marks picks
-taken/mine.
+**⚠️ Set Rounds to 14 in Settings before drafting on this board.** This app
+defaults to `rounds: 16`, which is wrong. The live API says so: `/api/draft`
+returns `teams: 20` and `totalPicks: 280`, and 280/20 = **14**. Sixteen invents
+two rounds that don't exist and makes every "your next pick" number wrong in the
+late draft. **This is a runtime-fixable setting, not a code fix — but the code
+default is still 16 and should be corrected when this board is next touched.**
+Found 2026-08-29 while porting this board into System Horizon; the SH copy
+already defaults to 14.
+
+**Draft is Saturday, August 30, 2026.** There are now **two** War Rooms:
+
+1. **This one (the fallback)** — `thelittlestaskew.github.io/Fantasy-Football/`.
+   Untouched, proven, works today. Set Rounds to 14 first.
+2. **The System Horizon copy** — `sh.tayloraritchie.com`, nav panel 10. Built
+   2026-08-29, defaults corrected, same features. Behind Cloudflare Access.
+
+**`localStorage` does not cross origins**, so the two boards do not share state
+and never will. Custom ranks, notes, and drafted marks made in one are invisible
+to the other. The SH copy has **Settings → Copy board state / Load pasted state**
+to move a board across by hand. **Pick one before the draft starts and stay in
+it** — running both means two diverging boards and no way to reconcile them
+mid-draft.
+
+**Do not delete this repo or the Vercel project.** The SH War Room calls
+`/api/adp` and `/api/draft` here cross-origin rather than duplicating them, so
+the ESPN cookies stay in exactly one place. That also means **SH's War Room has
+a hard runtime dependency on this Vercel project.**
+
+On draft day: open whichever board you chose and click **ESPN Sync: Off** to
+turn it on — polls every 5s and auto-marks picks taken/mine.
 
 **ESPN auth is working.** `ESPN_S2` / `ESPN_SWID` are set in Vercel and live —
-`/api/draft` returns `200 {"drafted":false,"teams":20,"totalPicks":280}`. This
-unblocks the League dashboard's Rosters tab, Sports Desk's My Players tab, and
-the `fantasy-check` skill, none of which had been runnable before.
+re-verified 2026-08-29, `/api/draft` returns
+`200 {"drafted":false,"inProgress":false,"teams":20,"totalPicks":280}`.
+`/api/adp` returns 271 players.
 
 Untested, because it can't be until after the draft:
 - League dashboard **Rosters** tab against real (not placeholder) lineups
@@ -29,7 +58,7 @@ Reference facts, verified against the live authenticated API on 2026-08-25:
   **9th overall**. Team **17** is "Goldfish Bowl", a different owner. A prior
   session had this wrong; see log.
 - League `1573934181`, "INSPIRED FANTASY FOOTBALL", 20 teams, snake, PPR,
-  H2H points, **private** (`isPublic: false`).
+  H2H points, **private** (`isPublic: false`). **14 rounds** (280 picks / 20).
 - **IDP league** — 2 DP lineup slots alongside offense/K/DST, 7 bench, 2 IR,
   2 FLEX. Position logic must handle DL/LB/DB.
 - Two divisions: "Chaos Division" and "Order Divison" (ESPN's typo), 10 each.
@@ -38,15 +67,34 @@ Reference facts, verified against the live authenticated API on 2026-08-25:
   shows 12 names with `drafted: false` and all projections null. Never treat a
   non-empty roster as proof the draft happened.
 
-Possible future work, nothing blocking: per-week matchup navigation on the
-league dashboard (shows current week only); a draft-recap view once
-`draftDetail.picks` populates; GHSA standings view (`api/ghsa.js?view=standings`
-exists and is unused by any UI).
+Possible future work, nothing blocking: correct the `rounds` default to 14 here;
+per-week matchup navigation on the league dashboard (shows current week only); a
+draft-recap view once `draftDetail.picks` populates; GHSA standings view
+(`api/ghsa.js?view=standings` exists and is unused by any UI).
 
 ---
 
 ## Log
 <!-- newest first. one entry per logical task/session. -->
+
+### 2026-08-29 · Claude chat (ported into System Horizon)
+- **Changed:** Nothing in this repo. Logged here because this repo's board was
+  ported into System Horizon as nav panel 10, and two facts about *this* code
+  came out of that port.
+  - **The `rounds: 16` default is wrong; it should be 14.** Caught by calling
+    `/api/draft` live rather than trusting the source: `teams: 20`,
+    `totalPicks: 280`. Fixed in the SH copy, **still wrong here.** See DO NEXT.
+  - **Both Vercel functions already send `Access-Control-Allow-Origin: *`**, so
+    SH consumes them directly instead of duplicating the ESPN cookie handling.
+    One source of truth, at the cost of a cross-repo runtime dependency.
+- **Commit:** none in this repo (HANDOFF only). SH-side commits: `984ba54`,
+  `909f7db`, `4d5057f`, `20b362a`.
+- **Next:** See DO NEXT — cookie rotation, then set Rounds to 14 if drafting here.
+- **Watch out:** **Verifying a value against the live API caught a bug that
+  reading the source could not.** The 16 looked like a deliberate setting; only
+  the API's own `totalPicks` proved otherwise. Generalisable: when porting code,
+  re-verify its constants against the system of record rather than carrying them
+  across intact.
 
 ### 2026-08-25 · Claude chat (sixth session — sports desk, advice API, skill)
 - **Changed:** Three things, plus a bug fix on the third.
@@ -100,7 +148,7 @@ exists and is unused by any UI).
     step. **Generalisable lesson: don't infer state from a count when the API
     exposes the state directly.**
   - **Claude Code skill discovery is path-strict**: only
-    `~/.claude/skills/<name>/SKILL.md` is found. A file at
+    `~/.claude/skills/<n>/SKILL.md` is found. A file at
     `~/.claude/skills/fantasy check.md` is silently invisible — `/fantasy-check`
     just won't exist, with no error. Documented in the skill's own Notes.
   - `api/scores.js` and `api/ghsa.js` were written **without any live testing** —
