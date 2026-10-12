@@ -2,6 +2,8 @@
 
 ## ▶ DO NEXT
 
+> 🆕 **2026-10-11: `/api/hub` is LIVE** (`3b1fb5d`, `ae8ce11`, `9a4f669`): one ~16KB call for the SH War Room's new **This Week** tab (matchup with both lineups live + projected, standings, healthy free agents, league transactions). Verified against the live league: 130.1 vs 137.6 in week 5, 19 transactions, 20 FAs, no section errors. `api/league.js` (6.7MB raw) and `api/advice.js` are unchanged. ⚠️ `advice.js` maps `defaultPositionId` 11 to DL; it is LB (hub's `_hub-shape.js` has it right). ▶ **The cookie rotation below is STILL open** and matters more now that Flaim also holds an ESPN session: after rotating, update `ESPN_S2` in Vercel AND click Re-sync in the Flaim extension. The draft-era notes below are history.
+
 **🔐 First, before anything else: rotate the ESPN cookie.** Tayls' `espn_s2`
 was pasted in plain text into a Claude Code transcript and is still a valid
 session credential for her ESPN account. Fix: log out of ESPN, log back in
@@ -76,6 +78,12 @@ draft-recap view once `draftDetail.picks` populates; GHSA standings view
 
 ## Log
 <!-- newest first. one entry per logical task/session. -->
+
+### 2026-10-11 18:10 ET · Claude Code
+- **Changed:** Added `api/hub.js` + pure `api/_hub-shape.js` + `api/_hub.test.mjs` (8 tests, `node --test api/_hub.test.mjs`). Edge-cached 60s. Underscore files are not routes.
+- **Commit:** `9a4f669`
+- **Friction:** gen-fail — hub read 0 vs 0 mid-week because `mMatchupScore`/`mStandings` weren't requested; then a PowerShell regex edit wrote literal `\n` into a comment and commented out `let league;`, so prod briefly returned "league is not defined". Fixed with a real edit and re-verified live.
+- **Next:** SH War Room This Week tab review (SH branch `war-room-season`); rotate the ESPN cookie.
 
 ### 2026-08-29 · Claude chat (ported into System Horizon)
 - **Changed:** Nothing in this repo. Logged here because this repo's board was
