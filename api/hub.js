@@ -60,7 +60,9 @@ export default async function handler(req, res) {
   const seasonBase = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${year}`;
   const base = `${seasonBase}/segments/0/leagues/${leagueId}`;
 
-  // mMatchupScore/mStandings carry the live pointsByScoringPeriod and projected\n  // totals; without them a week in progress reads 0 vs 0 (seen 2026-10-11).\n  let league;
+  // mMatchupScore/mStandings carry the live pointsByScoringPeriod and projected
+  // totals; without them a week in progress reads 0 vs 0 (seen 2026-10-11).
+  let league;
   try {
     league = await espnJson(`${base}?view=mTeam&view=mRoster&view=mMatchup&view=mMatchupScore&view=mStandings&view=mSettings`, cookie);
   } catch (err) {
