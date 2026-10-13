@@ -2,6 +2,8 @@
 
 ## ▶ DO NEXT
 
+> 🆕 **2026-10-12: `/api/hub` gains `standings[].form` (last 5 results) and `leaders` (week's top starters), on LOCAL branch `lithotripsy/hub-form-leaders` (`7e57cbf`), NOT pushed.** No extra ESPN calls; 11 tests pass. 🛑 Unpushed on purpose: every push to this repo triggers a Vercel deploy, which needs Taylor's OK. ▶ **On her OK: merge to `main` and push, then confirm `leaders` and `form` in the live response.** The SH War Room already reads both.
+>
 > 🆕 **2026-10-11: `/api/hub` is LIVE** (`3b1fb5d`, `ae8ce11`, `9a4f669`): one ~16KB call for the SH War Room's new **This Week** tab (matchup with both lineups live + projected, standings, healthy free agents, league transactions). Verified against the live league: 130.1 vs 137.6 in week 5, 19 transactions, 20 FAs, no section errors. `api/league.js` (6.7MB raw) and `api/advice.js` are unchanged. ⚠️ `advice.js` maps `defaultPositionId` 11 to DL; it is LB (hub's `_hub-shape.js` has it right). ▶ **The cookie rotation below is STILL open** and matters more now that Flaim also holds an ESPN session: after rotating, update `ESPN_S2` in Vercel AND click Re-sync in the Flaim extension. The draft-era notes below are history.
 
 **🔐 First, before anything else: rotate the ESPN cookie.** Tayls' `espn_s2`
@@ -78,6 +80,12 @@ draft-recap view once `draftDetail.picks` populates; GHSA standings view
 
 ## Log
 <!-- newest first. one entry per logical task/session. -->
+
+### 2026-10-12 22:30 ET · Claude Code
+- **Changed:** `_hub-shape.js` adds `shapeForm` and `shapeLeaders`; `hub.js` returns `leaders` and per-team `form`; 3 new tests (11 total). Local branch only.
+- **Commit:** `7e57cbf`
+- **Next:** Taylor OKs the push to `main` (auto-deploys).
+- **Watch out:** Not verified against live ESPN data yet, only fixtures; check the live response after deploy.
 
 ### 2026-10-11 18:10 ET · Claude Code
 - **Changed:** Added `api/hub.js` + pure `api/_hub-shape.js` + `api/_hub.test.mjs` (8 tests, `node --test api/_hub.test.mjs`). Edge-cached 60s. Underscore files are not routes.
