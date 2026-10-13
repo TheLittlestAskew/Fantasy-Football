@@ -2,6 +2,8 @@
 
 ## ▶ DO NEXT
 
+> 🆕 **2026-10-13 05:10: the `form` + `leaders` hub update is MERGED to `main`, pushed and LIVE (`387a2c5`), on Taylor's "go feed".** Verified against the live league: week 6, `form` populated for every team checked (`WWWWL`, `WWLWW`), `leaders` is `[]` with no section errors because no week 6 game has been played. ▶ **Worth one glance after Thursday's game: `leaders` should fill in.** That is the only part proven by fixture alone. Cookie rotation below is still open.
+>
 > 🆕 **2026-10-12: `/api/hub` gains `standings[].form` (last 5 results) and `leaders` (week's top starters), on LOCAL branch `lithotripsy/hub-form-leaders` (`7e57cbf`), NOT pushed.** No extra ESPN calls; 11 tests pass. 🛑 Unpushed on purpose: every push to this repo triggers a Vercel deploy, which needs Taylor's OK. ▶ **On her OK: merge to `main` and push, then confirm `leaders` and `form` in the live response.** The SH War Room already reads both.
 >
 > 🆕 **2026-10-11: `/api/hub` is LIVE** (`3b1fb5d`, `ae8ce11`, `9a4f669`): one ~16KB call for the SH War Room's new **This Week** tab (matchup with both lineups live + projected, standings, healthy free agents, league transactions). Verified against the live league: 130.1 vs 137.6 in week 5, 19 transactions, 20 FAs, no section errors. `api/league.js` (6.7MB raw) and `api/advice.js` are unchanged. ⚠️ `advice.js` maps `defaultPositionId` 11 to DL; it is LB (hub's `_hub-shape.js` has it right). ▶ **The cookie rotation below is STILL open** and matters more now that Flaim also holds an ESPN session: after rotating, update `ESPN_S2` in Vercel AND click Re-sync in the Flaim extension. The draft-era notes below are history.
@@ -80,6 +82,12 @@ draft-recap view once `draftDetail.picks` populates; GHSA standings view
 
 ## Log
 <!-- newest first. one entry per logical task/session. -->
+
+### 2026-10-13 05:10 ET · Claude Code
+- **Changed:** Fast-forwarded `main` to `lithotripsy/hub-form-leaders` and pushed; Vercel deployed it. Live response checked.
+- **Commit:** `387a2c5`
+- **Next:** Confirm `leaders` fills in once week 6 games start.
+- **Watch out:** `leaders` on live data is still unproven (empty list this early in the week).
 
 ### 2026-10-12 22:30 ET · Claude Code
 - **Changed:** `_hub-shape.js` adds `shapeForm` and `shapeLeaders`; `hub.js` returns `leaders` and per-team `form`; 3 new tests (11 total). Local branch only.
