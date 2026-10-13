@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   currentWeek, weekPoints, shapePlayer, shapeLineup, shapeMatchup, shapeStandings,
-  shapeFreeAgents, transactionPlayerIds, shapeTransactions, teamNames,
+  shapeFreeAgents, transactionPlayerIds, shapeTransactions, teamNames, shapeForm, shapeLeaders,
 } from './_hub-shape.js';
 
 const stat = (source, week, total) => ({ statSourceId: source, statSplitTypeId: 1, scoringPeriodId: week, appliedTotal: total });
@@ -119,4 +119,36 @@ test('transactions: executed moves only, named, newest first', () => {
   assert.deepEqual(s[1].drops, [{ player: 'Player 7', team: 'Hits Different' }]); // unnamed id stays visible
   assert.deepEqual(s[0].trades, [{ player: 'Ja', from: 'Halfling Hail', to: 'Hits Different' }]);
   assert.deepEqual(shapeTransactions(undefined, {}, names), []);
+});
+
+test('shapeForm keeps the last N decided results per team, oldest first', () => {
+  const g = (week, winner, home = 16, away = 20) => ({ matchupPeriodId: week, winner, home: { teamId: home }, away: { teamId: away } });
+  const l = { schedule: [g(3, 'AWAY'), g(1, 'HOME'), g(2, 'TIE'), g(4, 'UNDECIDED'), { matchupPeriodId: 2, winner: 'HOME', home: { teamId: 7 } }] };
+  assert.deepEqual(shapeForm(l), { 16: ['W', 'T', 'L'], 20: ['L', 'T', 'W'] });
+  assert.deepEqual(shapeForm(l, 2)[16], ['T', 'L']);
+  assert.deepEqual(shapeForm({}), {});
+  assert.deepEqual(shapeForm(null), {});
+});
+
+test('shapeStandings attaches form, empty when a team has no decided games', () => {
+  const l = league();
+  l.schedule[0].winner = 'HOME';
+  const rows = shapeStandings(l);
+  assert.deepEqual(rows.find((t) => t.teamId === 16).form, ['W']);
+  assert.deepEqual(rows.find((t) => t.teamId === 20).form, ['L']);
+  assert.deepEqual(shapeStandings(league())[0].form, []);
+});
+
+test('shapeLeaders ranks starters who have played, skipping bench and unplayed', () => {
+  const l = league();
+  l.teams[1].roster.entries = [
+    entry(0, player(7, { stats: [stat(0, 5, 41.2)] })),
+    entry(17, player(8, { stats: [stat(1, 5, 9)] })), // projected only: hasn't played
+  ];
+  const top = shapeLeaders(l, 5);
+  assert.deepEqual(top.map((p) => p.id), [7, 1, 2]); // bench player 3 is out
+  assert.equal(top[0].team, 'Halfling Hail');
+  assert.equal(top[0].points, 41.2);
+  assert.equal(shapeLeaders(l, 5, 1).length, 1);
+  assert.deepEqual(shapeLeaders({}, 5), []);
 });

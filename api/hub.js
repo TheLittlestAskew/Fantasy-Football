@@ -1,5 +1,6 @@
 // In-season hub for the System Horizon War Room: this week's matchup (both
-// lineups, live and projected), standings, healthy free agents, and recent
+// lineups, live and projected), standings with recent form, the week's top
+// scorers, healthy free agents, and recent
 // league transactions, in ONE small response.
 //
 // Why a new endpoint instead of api/league.js: league.js returns ESPN's raw
@@ -12,7 +13,7 @@
 // so one broken ESPN view never blanks the other three panels.
 
 import {
-  currentWeek, shapeMatchup, shapeStandings, shapeFreeAgents,
+  currentWeek, shapeMatchup, shapeStandings, shapeLeaders, shapeFreeAgents,
   shapeTransactions, transactionPlayerIds, teamNames,
 } from './_hub-shape.js';
 
@@ -84,11 +85,12 @@ export default async function handler(req, res) {
     leagueId, year, week, teamId,
     leagueName: (league.settings && league.settings.name) || null,
     fetchedAt: new Date().toISOString(),
-    matchup: null, standings: [], freeAgents: [], transactions: [],
+    matchup: null, standings: [], leaders: [], freeAgents: [], transactions: [],
   };
 
   try { out.matchup = shapeMatchup(league, teamId, week); } catch (err) { errors.matchup = err.message; }
   try { out.standings = shapeStandings(league); } catch (err) { errors.standings = err.message; }
+  try { out.leaders = shapeLeaders(league, week); } catch (err) { errors.leaders = err.message; }
 
   const faFilter = {
     players: {

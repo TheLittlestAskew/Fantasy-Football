@@ -110,7 +110,39 @@ export function shapeMatchup(league, teamId, week) {
   return { week, winner: game.winner || null, me: side(league, mine, week), opponent: side(league, theirs, week) };
 }
 
+// Each team's last `limit` decided results, oldest first: 'W', 'L' or 'T'.
+// Undecided games and byes (no away side) are skipped.
+const DECIDED = new Set(['HOME', 'AWAY', 'TIE']);
+export function shapeForm(league, limit = 5) {
+  const form = {};
+  const add = (teamId, result) => { if (Number.isInteger(teamId)) (form[teamId] ||= []).push(result); };
+  const games = ((league && league.schedule) || [])
+    .filter((m) => m && m.home && m.away && DECIDED.has(m.winner))
+    .sort((a, b) => a.matchupPeriodId - b.matchupPeriodId);
+  for (const m of games) {
+    add(m.home.teamId, m.winner === 'TIE' ? 'T' : m.winner === 'HOME' ? 'W' : 'L');
+    add(m.away.teamId, m.winner === 'TIE' ? 'T' : m.winner === 'AWAY' ? 'W' : 'L');
+  }
+  for (const id of Object.keys(form)) form[id] = form[id].slice(-limit);
+  return form;
+}
+
+// The week's top-scoring starters across every roster. Bench points don't
+// count for anyone, so they are left out; so is anyone who hasn't played.
+export function shapeLeaders(league, week, limit = 8) {
+  const leaders = [];
+  for (const t of (league && league.teams) || []) {
+    for (const p of shapeLineup(t.roster && t.roster.entries, week)) {
+      if (p.starting && typeof p.points === 'number') {
+        leaders.push({ id: p.id, name: p.name, pos: p.pos, proTeam: p.proTeam, points: p.points, teamId: t.id, team: teamName(t) });
+      }
+    }
+  }
+  return leaders.sort((a, b) => b.points - a.points).slice(0, limit);
+}
+
 export function shapeStandings(league) {
+  const form = shapeForm(league);
   const divisions = {};
   const div = league.settings && league.settings.scheduleSettings && league.settings.scheduleSettings.divisions;
   for (const d of div || []) divisions[d.id] = String(d.name || '').trim() || `Division ${d.id}`;
@@ -129,6 +161,7 @@ export function shapeStandings(league) {
         pointsAgainst: round1(o.pointsAgainst ?? 0),
         streak: o.streakType && o.streakType !== 'NONE' && o.streakLength
           ? `${o.streakType === 'WIN' ? 'W' : o.streakType === 'LOSS' ? 'L' : 'T'}${o.streakLength}` : null,
+        form: form[t.id] || [],
       };
     })
     // Seed when ESPN has assigned one; otherwise wins, then points for.
